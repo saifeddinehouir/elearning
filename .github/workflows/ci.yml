@@ -36,22 +36,22 @@ jobs:
 
   build-test:
     name: Native — build & unit test (iOS Simulator)
-    runs-on: macos-14
+    runs-on: macos-latest
 
     env:
       SCHEME: DailyQCM
       PROJECT: DailyQCM.xcodeproj
-      # Any always-present simulator on the Xcode 15.x runner image.
-      DESTINATION: 'platform=iOS Simulator,name=iPhone 15,OS=latest'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 15.4
+      - name: Select the newest available Xcode
         run: |
-          if [ -d /Applications/Xcode_15.4.app ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app
+          LATEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST" ]; then
+            echo "Selecting $LATEST"
+            sudo xcode-select -s "$LATEST"
           fi
           xcodebuild -version
           swift --version
@@ -61,6 +61,18 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
+
+      - name: Pick an available iPhone simulator
+        run: |
+          LINE=$(xcrun simctl list devices available | grep -m1 -E '^\s+iPhone .*\(')
+          NAME=$(echo "$LINE" | sed -E 's/^[[:space:]]+(iPhone [^(]+) \(.*/\1/' | sed -E 's/[[:space:]]+$//')
+          if [ -z "$NAME" ]; then
+            echo "No iPhone simulator found; listing what's available:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "Using simulator: $NAME"
+          echo "DESTINATION=platform=iOS Simulator,name=$NAME,OS=latest" >> "$GITHUB_ENV"
 
       - name: Build for testing
         run: |
