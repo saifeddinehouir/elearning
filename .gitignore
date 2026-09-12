@@ -1,0 +1,25 @@
+# Xcode / XcodeGen
+*.xcodeproj/
+*.xcworkspace/
+!default.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Fastlane / misc
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM

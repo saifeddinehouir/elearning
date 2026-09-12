@@ -1,0 +1,88 @@
+{
+  "deck_name": "LeetCode Patterns — Arrays & Search",
+  "source_type": "leetcode",
+  "items": [
+    {
+      "id": "c1a1a1a1-0001-4001-8001-000000000001",
+      "title": "Two Sum",
+      "topic": "Hash Map",
+      "difficulty": "easy",
+      "context": "Given an array of integers nums and an integer target, return the indices of the two numbers that add up to target. Exactly one solution exists and you may not use the same element twice.",
+      "questions": [
+        {
+          "id": "b1a1a1a1-0001-4001-8001-000000000001",
+          "type": "approach",
+          "prompt": "Which approach solves Two Sum in a single pass with O(n) time?",
+          "choices": [
+            "Store each seen value's index in a hash map and look up target - nums[i]",
+            "Sort the array, then binary search for each complement",
+            "Check every pair with two nested loops",
+            "Use a sliding window of size 2"
+          ],
+          "correct_index": 0,
+          "explanation": "As you iterate, check whether target - nums[i] is already in the map; if so you have the pair, otherwise insert nums[i]. One pass, O(n)."
+        },
+        {
+          "id": "b1a1a1a1-0002-4002-8002-000000000002",
+          "type": "complexity",
+          "prompt": "What are the time and space complexities of the hash-map Two Sum solution?",
+          "choices": ["O(n) time, O(n) space", "O(n log n) time, O(1) space", "O(n^2) time, O(1) space", "O(log n) time, O(n) space"],
+          "correct_index": 0,
+          "explanation": "Each element is visited once with O(1) expected map operations; the map can hold up to n entries."
+        }
+      ]
+    },
+    {
+      "id": "c1a1a1a1-0003-4003-8003-000000000003",
+      "title": "Binary Search on answer",
+      "topic": "Binary Search",
+      "difficulty": "medium",
+      "context": "Koko eats bananas: given piles[] and h hours, find the minimum integer eating speed k such that she finishes all piles within h hours. eating a pile of size p at speed k takes ceil(p / k) hours.",
+      "questions": [
+        {
+          "id": "b1a1a1a1-0004-4004-8004-000000000004",
+          "type": "approach",
+          "prompt": "Why can binary search be applied to the eating speed k?",
+          "choices": [
+            "The predicate 'can finish in h hours at speed k' is monotonic in k",
+            "The piles array is sorted",
+            "k is always a power of two",
+            "The total number of bananas is prime"
+          ],
+          "correct_index": 0,
+          "explanation": "If speed k works, every speed greater than k also works, so the feasible region is a suffix — search for its left boundary."
+        },
+        {
+          "id": "b1a1a1a1-0005-4005-8005-000000000005",
+          "type": "complexity",
+          "prompt": "With n piles and maximum pile size M, what is the time complexity?",
+          "choices": ["O(n log M)", "O(n^2)", "O(M log n)", "O(n log n)"],
+          "correct_index": 0,
+          "explanation": "Binary search over k in [1, M] does O(log M) iterations, each scanning all n piles to test feasibility."
+        }
+      ]
+    },
+    {
+      "id": "c1a1a1a1-0006-4006-8006-000000000006",
+      "title": "Kadane's algorithm",
+      "topic": "Dynamic Programming",
+      "difficulty": "medium",
+      "context": "Maximum Subarray: given an integer array nums, find the contiguous subarray with the largest sum and return that sum.",
+      "questions": [
+        {
+          "id": "b1a1a1a1-0007-4007-8007-000000000007",
+          "type": "fill_blank",
+          "prompt": "In Kadane's algorithm the running value updates as best_ending_here = max(nums[i], ______).",
+          "choices": [
+            "best_ending_here + nums[i]",
+            "best_ending_here - nums[i]",
+            "global_best + nums[i]",
+            "nums[i] * best_ending_here"
+          ],
+          "correct_index": 0,
+          "explanation": "At each index you either extend the previous subarray (best_ending_here + nums[i]) or start fresh at nums[i]."
+        }
+      ]
+    }
+  ]
+}

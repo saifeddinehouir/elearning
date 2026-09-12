@@ -1,0 +1,55 @@
+name: Deploy PWA to GitHub Pages
+
+# Publishes the pwa/ folder to GitHub Pages so it can be installed on an iPhone
+# (iOS needs an HTTPS URL, not localhost).
+#
+# One-time setup: repo Settings -> Pages -> Build and deployment -> Source =
+# "GitHub Actions". After the first run the app is at
+#   https://<user>.github.io/<repo>/
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "pwa/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests (pure logic)
+        working-directory: pwa
+        run: node --test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate icons
+        working-directory: pwa
+        run: node tools/make-icons.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pwa
+      - id: deployment
+        uses: actions/deploy-pages@v4
