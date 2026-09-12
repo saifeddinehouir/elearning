@@ -2,14 +2,20 @@ import Foundation
 import SwiftData
 
 enum DuplicateResolution: String, CaseIterable, Identifiable {
-    case replaceExisting
     case importAsCopy
+    case replaceExisting
 
     var id: String { rawValue }
     var label: String {
         switch self {
+        case .importAsCopy: "Import as a copy (recommended)"
         case .replaceExisting: "Replace existing deck"
-        case .importAsCopy: "Import as a copy"
+        }
+    }
+    var hint: String {
+        switch self {
+        case .importAsCopy: "Keeps both — the new one is renamed automatically."
+        case .replaceExisting: "Deletes its items, questions, review schedule and history."
         }
     }
 }

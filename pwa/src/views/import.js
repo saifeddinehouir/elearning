@@ -18,7 +18,9 @@ export function openImport(prefill = "") {
 
     let text = prefill;
     let validation = null;
-    let resolution = "replace";
+    // Default to the non-destructive choice: a name clash should never silently
+    // delete an existing deck's history unless the user deliberately picks that.
+    let resolution = "copy";
 
     const ta = h("textarea", {
       placeholder: '{ "deck_name": "...", "source_type": "course", "items": [ ... ] }',
@@ -58,6 +60,12 @@ export function openImport(prefill = "") {
 
     async function runImport() {
       if (!validation || !validation.importable) return;
+      if (resolution === "replace") {
+        const ok = confirm(
+          `Replace "${validation.dto.deck_name}"? This permanently deletes its current items, questions, review schedule and answer history. This can't be undone.`
+        );
+        if (!ok) return;
+      }
       const r = await importDeck(validation.dto, resolution);
       toast(`Imported ${r.deck.name} — ${r.itemCount} items, ${r.questionCount} questions`);
       close();
@@ -109,25 +117,39 @@ export function openImport(prefill = "") {
       const clash = await findDeckByName(v.dto.deck_name);
       if (clash && v.importable) {
         const pick = h("div", { class: "card tight" });
-        pick.appendChild(h("div", { class: "small muted" }, `A deck named "${v.dto.deck_name}" already exists:`));
-        for (const [val, label] of [
-          ["replace", "Replace existing deck"],
-          ["copy", "Import as a copy"],
+        pick.appendChild(
+          h(
+            "div",
+            { class: "small", style: "color:var(--orange)" },
+            `⚠️ A deck named "${v.dto.deck_name}" already exists.`
+          )
+        );
+        for (const [val, label, hint] of [
+          ["copy", "Import as a copy (recommended)", "Keeps both — the new one is renamed automatically."],
+          ["replace", "Replace existing deck", "Deletes its items, questions, review schedule and history."],
         ]) {
           const id = `res-${val}`;
           pick.appendChild(
             h(
               "label",
-              { class: "row", style: "gap:8px;margin-top:6px" },
+              { class: "row", style: "gap:8px;margin-top:8px;align-items:flex-start" },
               h("input", {
                 type: "radio",
                 name: "resolution",
                 id,
                 checked: resolution === val,
-                onchange: () => (resolution = val),
-                style: "width:auto",
+                onchange: () => {
+                  resolution = val;
+                  paint();
+                },
+                style: "width:auto;margin-top:3px",
               }),
-              h("span", {}, label)
+              h(
+                "span",
+                {},
+                h("div", {}, label),
+                h("div", { class: "small muted" }, hint)
+              )
             )
           );
         }

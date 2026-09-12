@@ -13,7 +13,10 @@ struct ImportView: View {
     @State private var showFileImporter = false
     @State private var parseError: String?
     @State private var validated: ValidatedImport?
-    @State private var resolution: DuplicateResolution = .replaceExisting
+    // Default to the non-destructive choice: a name clash should never silently
+    // delete an existing deck's history unless the user deliberately picks that.
+    @State private var resolution: DuplicateResolution = .importAsCopy
+    @State private var showReplaceConfirm = false
     @State private var importedSummary: String?
     @State private var justCopiedPrompt = false
 
@@ -96,10 +99,26 @@ struct ImportView: View {
                     Button("Validate", action: runValidation)
                         .disabled(jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 } else {
-                    Button("Import", action: runImport)
-                        .disabled(!(validated?.isImportable ?? false))
+                    Button("Import") {
+                        if nameClash && resolution == .replaceExisting {
+                            showReplaceConfirm = true
+                        } else {
+                            runImport()
+                        }
+                    }
+                    .disabled(!(validated?.isImportable ?? false))
                 }
             }
+        }
+        .confirmationDialog(
+            "Replace \"\(validated?.dto.deckName ?? "this deck")\"?",
+            isPresented: $showReplaceConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Replace and delete history", role: .destructive) { runImport() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes its current items, questions, review schedule and answer history. This can't be undone.")
         }
         .onChange(of: jsonText) { _, _ in
             validated = nil
@@ -166,9 +185,17 @@ struct ImportView: View {
         }
 
         if nameClash {
-            Section("A deck named \"\(v.dto.deckName)\" already exists") {
+            Section {
+                Label("A deck named \"\(v.dto.deckName)\" already exists.", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
                 Picker("On import", selection: $resolution) {
-                    ForEach(DuplicateResolution.allCases) { Text($0.label).tag($0) }
+                    ForEach(DuplicateResolution.allCases) { option in
+                        VStack(alignment: .leading) {
+                            Text(option.label)
+                            Text(option.hint).font(.caption).foregroundStyle(.secondary)
+                        }
+                        .tag(option)
+                    }
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
