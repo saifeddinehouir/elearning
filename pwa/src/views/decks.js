@@ -12,6 +12,7 @@ import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
 import { empty } from "./daily.js";
+import { PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
 export async function renderDecks() {
   const decks = await listDecks();
@@ -35,9 +36,26 @@ export async function renderDecks() {
     wrap.appendChild(
       h(
         "div",
-        { class: "row", style: "gap:10px;justify-content:center" },
+        { class: "row", style: "gap:10px;justify-content:center;flex-wrap:wrap" },
         h("button", { class: "btn", onclick: () => sample("course") }, "Load course sample"),
         h("button", { class: "btn", onclick: () => sample("leetcode") }, "Load LeetCode sample")
+      )
+    );
+    wrap.appendChild(
+      h(
+        "div",
+        { class: "row", style: "justify-content:center;margin-top:10px" },
+        h(
+          "button",
+          {
+            class: "btn",
+            onclick: async () => {
+              const ok = await copyText(PROMPT_TEMPLATE);
+              toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
+            },
+          },
+          "📋 Copy the ChatGPT/Claude prompt"
+        )
       )
     );
     return wrap;

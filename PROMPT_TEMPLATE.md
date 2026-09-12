@@ -3,6 +3,11 @@
 Paste the block below into ChatGPT or Claude, then append your course text or a
 LeetCode problem. Save the reply as a `.json` file and import it in **Decks ▸ +**.
 
+> Both apps now have a **"Copy the ChatGPT/Claude prompt"** button right in the
+> Import screen, so you don't need this file at hand — it's kept here for reference
+> and stays in sync with `pwa/src/prompt-template.js` and
+> `DailyQCM/Common/PromptTemplate.swift`.
+
 ---
 
 You are generating a study deck for a spaced-repetition quiz app. Output **only** valid

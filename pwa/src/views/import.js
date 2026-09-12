@@ -1,6 +1,7 @@
 import { h, clear, openOverlay, toast } from "../dom.js";
 import { parseDeck, validateDeck } from "../schema.js";
 import { importDeck, findDeckByName } from "../store.js";
+import { PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
 export function openImport(prefill = "") {
   openOverlay((close) => {
@@ -135,6 +136,7 @@ export function openImport(prefill = "") {
     }
 
     body.append(
+      promptTemplateSection(),
       h("label", { class: "field" }, h("span", {}, "Paste JSON"), ta),
       fileInput,
       result
@@ -145,6 +147,51 @@ export function openImport(prefill = "") {
 
     return overlay;
   });
+}
+
+function promptTemplateSection() {
+  const det = h("details", { class: "q-context" });
+  const copyBtn = h(
+    "button",
+    {
+      class: "btn primary",
+      onclick: async () => {
+        const ok = await copyText(PROMPT_TEMPLATE);
+        if (ok) {
+          toast("Prompt copied — paste it into ChatGPT or Claude");
+        } else {
+          promptText.focus();
+          promptText.select();
+          toast("Couldn't auto-copy — text is selected, press Ctrl/Cmd+C");
+        }
+      },
+    },
+    "Copy prompt"
+  );
+  const promptText = h("textarea", {
+    readOnly: true,
+    value: PROMPT_TEMPLATE,
+    style: "min-height:220px;margin-top:10px",
+    onclick: (e) => e.target.select(),
+  });
+
+  det.append(
+    h(
+      "summary",
+      {},
+      h("span", {}, "🤖 No content yet? Copy the generator prompt for ChatGPT / Claude"),
+    ),
+    h("div", { class: "body" }, [
+      h(
+        "p",
+        { class: "small muted", style: "margin-bottom:10px" },
+        "Copy this, paste it into ChatGPT or Claude, add your course excerpt or LeetCode problem below it, and paste the JSON it returns back here."
+      ),
+      copyBtn,
+      promptText,
+    ])
+  );
+  return det;
 }
 
 function row(k, v) {

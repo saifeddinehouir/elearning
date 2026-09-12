@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import UIKit
 
 struct ImportView: View {
     var prefilledJSON: String?
@@ -14,6 +15,7 @@ struct ImportView: View {
     @State private var validated: ValidatedImport?
     @State private var resolution: DuplicateResolution = .replaceExisting
     @State private var importedSummary: String?
+    @State private var justCopiedPrompt = false
 
     private var nameClash: Bool {
         guard let validated else { return false }
@@ -22,6 +24,28 @@ struct ImportView: View {
 
     var body: some View {
         Form {
+            Section {
+                DisclosureGroup("🤖 No content yet? Copy the generator prompt for ChatGPT / Claude") {
+                    Text("Copy this, paste it into ChatGPT or Claude, add your course excerpt or LeetCode problem below it, and paste the JSON it returns back here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ScrollView {
+                        Text(PromptTemplate.text)
+                            .font(.system(.caption2, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(height: 180)
+                    Button {
+                        UIPasteboard.general.string = PromptTemplate.text
+                        justCopiedPrompt = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { justCopiedPrompt = false }
+                    } label: {
+                        Label(justCopiedPrompt ? "Copied!" : "Copy prompt", systemImage: justCopiedPrompt ? "checkmark" : "doc.on.doc")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+
             Section("Paste JSON") {
                 TextEditor(text: $jsonText)
                     .font(.system(.footnote, design: .monospaced))

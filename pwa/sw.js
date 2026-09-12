@@ -24,6 +24,7 @@ const SHELL = [
   "src/charts.js",
   "src/format.js",
   "src/notifications.js",
+  "src/prompt-template.js",
   "samples/course.json",
   "samples/leetcode.json",
   "src/views/import.js",
