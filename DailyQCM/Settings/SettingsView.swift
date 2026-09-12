@@ -40,7 +40,7 @@ struct SettingsView: View {
                         refreshReminder()
                     }
                 if reminderEnabled {
-                    DatePicker("Time", selection: reminderTime, displayComponents: .hourAndMinute)
+                    DatePicker("Time", selection: reminderTime, displayedComponents: .hourAndMinute)
                 }
                 Text("A local notification fires only on days you haven't studied yet. No account, no server.")
                     .font(.caption).foregroundStyle(.secondary)
