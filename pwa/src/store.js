@@ -112,6 +112,35 @@ export async function getDeckDetail(deckId) {
   return { deck, items: itemList };
 }
 
+// Reconstructs a deck back into the unified JSON schema (the inverse of
+// importDeck) so it can be backed up, edited, handed to someone else, or fed
+// back to ChatGPT/Claude to extend.
+export async function exportDeckJSON(deckId) {
+  const detail = await getDeckDetail(deckId);
+  if (!detail) return null;
+  const { deck, items } = detail;
+  const dto = {
+    deck_name: deck.name,
+    source_type: deck.sourceType,
+    items: items.map((it) => ({
+      id: it.id,
+      title: it.title,
+      topic: it.topic,
+      difficulty: it.difficulty,
+      context: it.context,
+      questions: it.questions.map((q) => ({
+        id: q.id,
+        type: q.kind,
+        prompt: q.prompt,
+        choices: q.choices,
+        correct_index: q.correctIndex,
+        explanation: q.explanation,
+      })),
+    })),
+  };
+  return JSON.stringify(dto, null, 2);
+}
+
 // Returns question objects shaped for composeSession(): { id, topic, difficulty,
 // deckId, deckName, prompt, choices, correctIndex, explanation, kind,
 // reviewState, attempts }.

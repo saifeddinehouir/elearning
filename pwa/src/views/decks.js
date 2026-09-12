@@ -7,6 +7,7 @@ import {
   setDeckIncludeInMix,
   getSettings,
   loadSampleDeck,
+  exportDeckJSON,
 } from "../store.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
@@ -158,6 +159,19 @@ async function openDeckDetail(deckId) {
           h("span", {}, deck.sourceType === "leetcode" ? "LeetCode" : "Course"),
           h("span", {}, `${items.length} items`),
           h("span", {}, `${totalQ} questions`)
+        ),
+        h(
+          "button",
+          {
+            class: "btn block mt",
+            disabled: totalQ === 0,
+            onclick: async () => {
+              const json = await exportDeckJSON(deckId);
+              const ok = await copyText(json);
+              toast(ok ? "Deck JSON copied — paste it anywhere to back it up or re-import" : "Couldn't copy — check clipboard permissions");
+            },
+          },
+          "📋 Export JSON"
         ),
         h(
           "button",
