@@ -1,6 +1,6 @@
 // DailyQCM service worker — offline app shell + notification click handling.
 // Bump CACHE whenever shell files change.
-const CACHE = "dailyqcm-v2";
+const CACHE = "dailyqcm-v3";
 
 const SHELL = [
   ".",
@@ -41,7 +41,22 @@ self.addEventListener("install", (event) => {
   // Precache the new shell but stay in "waiting" until the page asks us to take
   // over (see src/updates.js) — that way an update never yanks the app out from
   // under someone mid-session.
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  //
+  // Deliberately NOT cache.addAll(SHELL): addAll's underlying fetch can be
+  // satisfied by the browser's ordinary HTTP cache, which would "refresh" this
+  // Cache Storage entry with a file that's still stale. { cache: "reload" }
+  // forces every shell file to come straight from the network.
+  event.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      Promise.all(
+        SHELL.map((url) =>
+          fetch(url, { cache: "reload" }).then((resp) => {
+            if (resp.ok) return cache.put(url, resp);
+          })
+        )
+      )
+    )
+  );
 });
 
 self.addEventListener("message", (event) => {
