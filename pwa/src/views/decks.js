@@ -27,6 +27,26 @@ export async function renderDecks() {
     )
   );
 
+  // Always available, not just on the empty state — you need this just as much
+  // once you already have decks and want to generate another one.
+  wrap.appendChild(
+    h(
+      "div",
+      { class: "row", style: "justify-content:center;margin-bottom:14px" },
+      h(
+        "button",
+        {
+          class: "btn block",
+          onclick: async () => {
+            const ok = await copyText(PROMPT_TEMPLATE);
+            toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
+          },
+        },
+        "📋 Copy the ChatGPT/Claude prompt"
+      )
+    )
+  );
+
   if (decks.length === 0) {
     wrap.appendChild(
       empty("🗂", "No decks", "Import a JSON deck, or load a sample to try the app.", {
@@ -40,23 +60,6 @@ export async function renderDecks() {
         { class: "row", style: "gap:10px;justify-content:center;flex-wrap:wrap" },
         h("button", { class: "btn", onclick: () => sample("course") }, "Load course sample"),
         h("button", { class: "btn", onclick: () => sample("leetcode") }, "Load LeetCode sample")
-      )
-    );
-    wrap.appendChild(
-      h(
-        "div",
-        { class: "row", style: "justify-content:center;margin-top:10px" },
-        h(
-          "button",
-          {
-            class: "btn",
-            onclick: async () => {
-              const ok = await copyText(PROMPT_TEMPLATE);
-              toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
-            },
-          },
-          "📋 Copy the ChatGPT/Claude prompt"
-        )
       )
     );
     return wrap;
