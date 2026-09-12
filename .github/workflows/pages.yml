@@ -3,8 +3,9 @@ name: Deploy PWA to GitHub Pages
 # Publishes the pwa/ folder to GitHub Pages so it can be installed on an iPhone
 # (iOS needs an HTTPS URL, not localhost).
 #
-# One-time setup: repo Settings -> Pages -> Build and deployment -> Source =
-# "GitHub Actions". After the first run the app is at
+# No manual setup needed: configure-pages' `enablement: true` below turns Pages
+# on (source = GitHub Actions) the first time this runs. After that first run,
+# the app is at:
 #   https://<user>.github.io/<repo>/
 
 on:
@@ -48,6 +49,8 @@ jobs:
         working-directory: pwa
         run: node tools/make-icons.mjs
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: pwa
