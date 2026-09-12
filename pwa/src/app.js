@@ -1,6 +1,7 @@
 import { h, clear, ICONS } from "./dom.js";
 import { onChange } from "./store.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
+import { watchForUpdates } from "./updates.js";
 
 import { renderDaily } from "./views/daily.js";
 import { renderStats } from "./views/stats.js";
@@ -32,6 +33,17 @@ function nudgeBanner() {
   );
 }
 
+let activateUpdate = null;
+function updateBanner() {
+  if (!activateUpdate) return null;
+  return h(
+    "div",
+    { class: "nudge row between" },
+    h("span", {}, "A new version of DailyQCM is ready."),
+    h("button", { class: "btn primary", style: "padding:6px 12px", onclick: () => activateUpdate() }, "Reload")
+  );
+}
+
 async function render() {
   const tab = TABS.find((t) => t.id === current) || TABS[0];
 
@@ -40,6 +52,8 @@ async function render() {
   appRoot.appendChild(tabbar());
 
   const view = shell.querySelector("#view");
+  const upd = updateBanner();
+  if (upd) view.appendChild(upd);
   const banner = nudgeBanner();
   if (banner) view.appendChild(banner);
 
@@ -86,5 +100,10 @@ startNudgeWatcher(() => {
   }
 });
 
-registerServiceWorker();
+registerServiceWorker().then(() => {
+  watchForUpdates((activate) => {
+    activateUpdate = activate;
+    render();
+  });
+});
 render();

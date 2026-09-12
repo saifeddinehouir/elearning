@@ -115,6 +115,14 @@ See [`../PROMPT_TEMPLATE.md`](../PROMPT_TEMPLATE.md) for the generator prompt.
   push needs a small server (VAPID keys + `web-push` + cron); the service worker
   already has the `push` / `notificationclick` handlers for when you add one.
 
+## Updating an installed copy
+
+The service worker caches the app for offline use, so a new deploy doesn't reach an
+already-installed icon instantly. `src/updates.js` checks for a new version whenever
+the app is foregrounded and shows an in-app **"A new version is ready — Reload"**
+banner as soon as one is detected — tap it and it activates immediately, no need to
+delete and re-add the icon.
+
 ## Data & privacy
 
 Everything is stored locally in the browser (IndexedDB + `localStorage`). Nothing
