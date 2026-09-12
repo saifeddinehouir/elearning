@@ -117,11 +117,12 @@ See [`../PROMPT_TEMPLATE.md`](../PROMPT_TEMPLATE.md) for the generator prompt.
 
 ## Updating an installed copy
 
-The service worker caches the app for offline use, so a new deploy doesn't reach an
-already-installed icon instantly. `src/updates.js` checks for a new version whenever
-the app is foregrounded and shows an in-app **"A new version is ready — Reload"**
-banner as soon as one is detected — tap it and it activates immediately, no need to
-delete and re-add the icon.
+`sw.js` uses a **network-first** strategy: while you're online, every load fetches
+the current deploy directly (the cache only kicks in when offline). So most changes
+show up the moment you reopen the app — no waiting on service-worker lifecycle
+timing. The one case that still needs a nudge is when `sw.js` itself changes; for
+that, `src/updates.js` shows an in-app **"A new version is ready — Reload"** banner
+as soon as it detects one — tap it and it activates immediately.
 
 ## Data & privacy
 

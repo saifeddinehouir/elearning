@@ -1,6 +1,6 @@
 // DailyQCM service worker — offline app shell + notification click handling.
 // Bump CACHE whenever shell files change.
-const CACHE = "dailyqcm-v3";
+const CACHE = "dailyqcm-v4";
 
 const SHELL = [
   ".",
@@ -78,28 +78,37 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigation requests -> app shell (SPA).
-  if (request.mode === "navigate") {
-    event.respondWith(
-      caches.match("index.html").then((cached) => cached || fetch(request))
-    );
-    return;
-  }
-
-  // Static assets: cache-first, fall back to network and populate the cache.
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((resp) => {
-        if (resp.ok && resp.type === "basic") {
-          const copy = resp.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-        }
-        return resp;
-      });
-    })
-  );
+  event.respondWith(networkFirst(request));
 });
+
+// Network-first, falling back to cache only when offline.
+//
+// A previous version of this file was cache-first, which meant an app update
+// could sit invisible in Cache Storage indefinitely: the update-detection
+// dance below only runs when THIS FILE's own bytes change, but most day-to-day
+// changes only touch app JS, not sw.js. Network-first sidesteps that whole
+// class of bug — when you're online (the common case) you always get the
+// current deploy, no service-worker lifecycle required. Offline support is
+// still there via the cache populated on install and refreshed on every
+// successful fetch.
+async function networkFirst(request) {
+  try {
+    const fresh = await fetch(request, { cache: "no-store" });
+    if (fresh.ok) {
+      const cache = await caches.open(CACHE);
+      cache.put(request, fresh.clone());
+    }
+    return fresh;
+  } catch {
+    const cached = await caches.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    if (request.mode === "navigate") {
+      const shell = await caches.match("index.html");
+      if (shell) return shell;
+    }
+    return Response.error();
+  }
+}
 
 // Reminder notifications (shown from the page or a future push server).
 self.addEventListener("notificationclick", (event) => {
