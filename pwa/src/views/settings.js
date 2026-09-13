@@ -1,4 +1,4 @@
-import { h, openOverlay, toast } from "../dom.js";
+import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getSettings, setSettings } from "../store.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
@@ -11,34 +11,49 @@ export function openSettings() {
     overlay.append(head, body);
     head.append(h("button", { class: "btn", onclick: close }, "Done"), h("strong", {}, "Settings"), h("div", { class: "spacer" }));
 
-    // Daily goal
+    // ---------- Daily session ----------
+    body.appendChild(h("div", { class: "section-header" }, "Daily session"));
+    const sessionList = h("div", { class: "list" });
+
     const goalVal = h("strong", {}, String(s.dailyGoal));
-    body.appendChild(
-      card("Daily session", [
+    sessionList.appendChild(
+      row(ICONS.target, "c-accent", "Daily goal", [
         h(
           "div",
-          { class: "row between" },
-          h("span", {}, "Daily goal"),
-          h(
-            "div",
-            { class: "row", style: "gap:10px" },
-            h("button", { class: "btn", onclick: () => bumpGoal(-5) }, "−"),
-            goalVal,
-            h("button", { class: "btn", onclick: () => bumpGoal(5) }, "+")
-          )
-        ),
-        h("label", { class: "field mt" },
-          h("span", {}, `Max new questions per session: ${Math.round(s.newLimitRatio * 100)}%`),
-          h("input", {
-            type: "range", min: "20", max: "100", step: "10",
-            value: String(Math.round(s.newLimitRatio * 100)),
-            oninput: (e) => {
-              setSettings({ newLimitRatio: Number(e.target.value) / 100 });
-              e.target.previousElementSibling.textContent = `Max new questions per session: ${e.target.value}%`;
-            },
-          })
+          { class: "stepper" },
+          h("button", { onclick: () => bumpGoal(-5) }, "−"),
+          goalVal,
+          h("button", { onclick: () => bumpGoal(5) }, "+")
         ),
       ])
+    );
+
+    let ratioValueEl;
+    sessionList.appendChild(
+      row(ICONS.sliders, "c-purple", "Max new per session", [
+        (ratioValueEl = h("span", { class: "value" }, `${Math.round(s.newLimitRatio * 100)}%`)),
+      ])
+    );
+    body.appendChild(sessionList);
+
+    const ratioSliderWrap = h("div", { class: "list", style: "padding:14px 16px 16px" });
+    ratioSliderWrap.appendChild(
+      h("input", {
+        type: "range",
+        min: "20",
+        max: "100",
+        step: "10",
+        value: String(Math.round(s.newLimitRatio * 100)),
+        style: "accent-color:var(--accent)",
+        oninput: (e) => {
+          setSettings({ newLimitRatio: Number(e.target.value) / 100 });
+          ratioValueEl.textContent = `${e.target.value}%`;
+        },
+      })
+    );
+    body.appendChild(ratioSliderWrap);
+    body.appendChild(
+      h("p", { class: "list-footnote" }, "Keeps reviews from being crowded out by new questions in a single session.")
     );
 
     function bumpGoal(delta) {
@@ -47,8 +62,10 @@ export function openSettings() {
       goalVal.textContent = String(next);
     }
 
-    // Reminder
-    const reminderCard = card("Reminder", []);
+    // ---------- Reminder ----------
+    body.appendChild(h("div", { class: "section-header" }, "Reminder"));
+    const reminderList = h("div", { class: "list" });
+
     const enabledCb = h("input", {
       type: "checkbox",
       checked: s.reminderEnabled,
@@ -58,28 +75,33 @@ export function openSettings() {
         paintPermission();
       },
     });
-    reminderCard.appendChild(h("label", { class: "switch" }, h("span", {}, "Evening reminder"), enabledCb));
+    reminderList.appendChild(
+      row(ICONS.bell, "c-orange", "Evening reminder", [
+        h("label", { class: "switch", style: "padding:0" }, enabledCb),
+      ])
+    );
 
     const timeInput = h("input", {
       type: "time",
       value: `${String(s.reminderHour).padStart(2, "0")}:${String(s.reminderMinute).padStart(2, "0")}`,
+      style: "width:auto;background:none;border:none;padding:0;text-align:right;color:var(--accent);font-weight:600",
       onchange: (e) => {
         const [hh, mm] = e.target.value.split(":").map(Number);
         setSettings({ reminderHour: hh || 0, reminderMinute: mm || 0 });
       },
     });
-    reminderCard.appendChild(h("label", { class: "field mt" }, h("span", {}, "Time"), timeInput));
+    reminderList.appendChild(row(ICONS.clock, "c-teal", "Time", [timeInput]));
+    body.appendChild(reminderList);
 
-    const permLine = h("p", { class: "small muted mt" }, "");
-    reminderCard.appendChild(permLine);
-    reminderCard.appendChild(
+    const permLine = h("p", { class: "list-footnote" }, "");
+    body.appendChild(permLine);
+    body.appendChild(
       h(
         "p",
-        { class: "small muted mt" },
+        { class: "list-footnote" },
         "The reminder fires when you open the app after this time on a day you haven't studied. True background delivery needs a push server (see README)."
       )
     );
-    body.appendChild(reminderCard);
 
     function paintPermission() {
       if (!notificationsSupported()) {
@@ -96,11 +118,15 @@ export function openSettings() {
     }
     paintPermission();
 
-    body.appendChild(
+    // ---------- Reset ----------
+    body.appendChild(h("div", { class: "section-header" }, "Data"));
+    const resetList = h("div", { class: "list" });
+    resetList.appendChild(
       h(
         "button",
         {
-          class: "btn danger block",
+          class: "list-row tappable",
+          style: "width:100%;text-align:left;color:var(--red)",
           onclick: () => {
             if (confirm("Reset all settings to defaults?")) {
               localStorage.removeItem("dailyqcm.settings");
@@ -109,14 +135,22 @@ export function openSettings() {
             }
           },
         },
-        "Reset settings"
+        h("span", { class: "icon-chip c-red", html: ICONS.trash }),
+        h("span", { class: "label" }, "Reset settings")
       )
     );
+    body.appendChild(resetList);
 
     return overlay;
   });
 }
 
-function card(title, children) {
-  return h("div", { class: "card" }, h("div", { class: "section-title" }, title), ...children);
+function row(iconSvg, chipClass, label, trailing) {
+  return h(
+    "div",
+    { class: "list-row inset" },
+    h("span", { class: `icon-chip ${chipClass}`, html: iconSvg }),
+    h("span", { class: "label" }, label),
+    ...trailing
+  );
 }

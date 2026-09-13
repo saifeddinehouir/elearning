@@ -63,13 +63,12 @@ function tile(value, label) {
 function segmented(options, selected, onSelect) {
   return h(
     "div",
-    { class: "row", style: "gap:6px;margin-bottom:10px" },
+    { class: "segmented", style: "margin-bottom:12px" },
     ...options.map(([v, label]) =>
       h(
         "button",
         {
-          class: v === selected ? "btn primary" : "btn",
-          style: "padding:6px 12px;flex:1",
+          class: v === selected ? "active" : "",
           onclick: () => onSelect(v),
         },
         label

@@ -1,4 +1,4 @@
-import { h } from "../dom.js";
+import { h, ICONS } from "../dom.js";
 import { getDailyPool, getAllStudyDays, getSettings, studiedToday, listDecks } from "../store.js";
 import { composeSession } from "../session.js";
 import { currentStreak } from "../streak.js";
@@ -22,7 +22,7 @@ export async function renderDaily() {
       "div",
       { class: "row between" },
       h("h1", { class: "screen-title" }, "Today"),
-      h("button", { class: "btn", onclick: () => openSettings(), "aria-label": "Settings" }, "⚙")
+      h("button", { class: "btn", style: "padding:10px", onclick: () => openSettings(), "aria-label": "Settings", html: ICONS.gear })
     )
   );
 
@@ -95,7 +95,7 @@ function compRow(color, label, n) {
   return h(
     "div",
     { class: n === 0 ? "comp-row zero" : "comp-row" },
-    h("span", { class: "dot", style: `background:${color}` }),
+    h("span", { class: "dot", style: `background:${color};color:${color}` }),
     h("span", {}, label),
     h("span", { class: "n" }, String(n))
   );

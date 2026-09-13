@@ -29,7 +29,8 @@ function nudgeBanner() {
   return h(
     "div",
     { class: "nudge" },
-    "It's past your reminder time and you haven't studied yet today. Start a session to keep your streak."
+    h("span", { class: "icon-chip c-orange", html: ICONS.bell }),
+    h("span", {}, "It's past your reminder time and you haven't studied yet today. Start a session to keep your streak.")
   );
 }
 
@@ -38,9 +39,10 @@ function updateBanner() {
   if (!activateUpdate) return null;
   return h(
     "div",
-    { class: "nudge row between" },
-    h("span", {}, "A new version of DailyQCM is ready."),
-    h("button", { class: "btn primary", style: "padding:6px 12px", onclick: () => activateUpdate() }, "Reload")
+    { class: "nudge" },
+    h("span", { class: "icon-chip c-accent", html: ICONS.refresh }),
+    h("span", { class: "spacer" }, "A new version of DailyQCM is ready."),
+    h("button", { class: "btn primary", style: "padding:8px 14px", onclick: () => activateUpdate() }, "Reload")
   );
 }
 

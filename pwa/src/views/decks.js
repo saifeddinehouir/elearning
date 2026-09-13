@@ -1,4 +1,4 @@
-import { h, toast, openOverlay } from "../dom.js";
+import { h, toast, openOverlay, ICONS } from "../dom.js";
 import {
   listDecks,
   getDeckDetail,
@@ -78,27 +78,31 @@ export async function renderDecks() {
         }
       },
     });
+    const isLeetcode = d.sourceType === "leetcode";
     card.appendChild(
       h(
         "div",
-        { class: "row between" },
-        h("h3", {}, d.name),
-        h("span", { class: "badge accent" }, d.sourceType === "leetcode" ? "LeetCode" : "Course")
-      )
-    );
-    card.appendChild(
-      h(
-        "div",
-        { class: "meta" },
-        h("span", {}, `${d.itemCount} items`),
-        h("span", {}, `${d.questionCount} questions`),
-        d.dueCount > 0 ? h("span", { style: "color:var(--accent)" }, `${d.dueCount} due`) : null
+        { class: "row", style: "align-items:flex-start" },
+        h("span", { class: `icon-chip ${isLeetcode ? "c-purple" : "c-accent"}`, html: isLeetcode ? ICONS.code : ICONS.book }),
+        h(
+          "div",
+          { class: "spacer" },
+          h("h3", {}, d.name),
+          h(
+            "div",
+            { class: "meta" },
+            h("span", {}, `${d.itemCount} items`),
+            h("span", {}, `${d.questionCount} questions`),
+            d.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${d.dueCount} due`) : null
+          )
+        ),
+        h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px;margin-top:6px" })
       )
     );
     const prog = h("div", { class: "progress" }, h("i", {}));
     prog.firstChild.style.width = `${Math.round(d.studiedFraction * 100)}%`;
     card.appendChild(prog);
-    card.appendChild(h("div", { class: "small muted", style: "margin-top:4px" }, `${Math.round(d.studiedFraction * 100)}% studied`));
+    card.appendChild(h("div", { class: "small muted", style: "margin-top:6px" }, `${Math.round(d.studiedFraction * 100)}% studied`));
 
     const sw = h("label", { class: "switch", onclick: (e) => e.stopPropagation() });
     const cb = h("input", {
