@@ -1,7 +1,7 @@
 import { h, clear, openOverlay, toast } from "../dom.js";
-import { parseDeck, validateDeck } from "../schema.js";
-import { importDeck, findDeckByName } from "../store.js";
-import { PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
+import { parseDeck, validateDeck, validateRoadmap, detectKind } from "../schema.js";
+import { importDeck, importRoadmap, findDeckByName } from "../store.js";
+import { PROMPT_TEMPLATE, ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
 export function openImport(prefill = "") {
   openOverlay((close) => {
@@ -18,18 +18,19 @@ export function openImport(prefill = "") {
 
     head.append(
       h("button", { class: "btn", onclick: close }, "Close"),
-      h("strong", {}, "Import decks"),
+      h("strong", {}, "Import"),
       h("div", { class: "spacer" }),
       importBtn
     );
 
-    // Each candidate: { id, label, parseError, validation, resolution, clashName }
+    // Each candidate: { id, label, kind, parseError, validation, resolution, clashName }
     // "id" is "paste" for the textarea, or the filename for a picked file.
+    // "kind" is "deck" or "roadmap", detected from the JSON shape.
     const candidates = new Map();
     let pasteText = prefill;
 
     const ta = h("textarea", {
-      placeholder: '{ "deck_name": "...", "source_type": "course", "items": [ ... ] }',
+      placeholder: 'A deck: { "deck_name": "...", "source_type": "course", "items": [ ... ] }\nOr a roadmap: { "roadmap_name": "...", "nodes": [ ... ] }',
       value: prefill,
       oninput: (e) => {
         pasteText = e.target.value;
@@ -70,14 +71,21 @@ export function openImport(prefill = "") {
       const existing = candidates.get(id);
       let validation = null;
       let clashName = null;
+      let kind = "deck";
       if (parsed.ok) {
-        validation = { ...validateDeck(parsed.dto), dto: parsed.dto };
-        const clash = await findDeckByName(parsed.dto.deck_name);
-        clashName = clash ? clash.name : null;
+        kind = detectKind(parsed.dto);
+        if (kind === "roadmap") {
+          validation = { ...validateRoadmap(parsed.dto), dto: parsed.dto };
+        } else {
+          validation = { ...validateDeck(parsed.dto), dto: parsed.dto };
+          const clash = await findDeckByName(parsed.dto.deck_name);
+          clashName = clash ? clash.name : null;
+        }
       }
       candidates.set(id, {
         id,
         label,
+        kind,
         parseError: parsed.ok ? null : parsed.error,
         validation,
         resolution: existing?.resolution || "copy",
@@ -107,7 +115,8 @@ export function openImport(prefill = "") {
       let imported = 0;
       for (const c of importable) {
         try {
-          await importDeck(c.validation.dto, c.resolution);
+          if (c.kind === "roadmap") await importRoadmap(c.validation.dto);
+          else await importDeck(c.validation.dto, c.resolution);
           imported += 1;
         } catch (err) {
           console.error("Import failed for", c.label, err);
@@ -115,7 +124,7 @@ export function openImport(prefill = "") {
       }
       const skipped = candidates.size - imported;
       toast(
-        `Imported ${imported} deck${imported === 1 ? "" : "s"}` +
+        `Imported ${imported} item${imported === 1 ? "" : "s"}` +
           (skipped > 0 ? ` — ${skipped} skipped (fix errors first)` : "")
       );
       close();
@@ -167,9 +176,14 @@ export function openImport(prefill = "") {
         h(
           "div",
           { class: "row small muted", style: "margin-top:6px;flex-wrap:wrap;gap:10px" },
-          h("span", {}, v.dto.deck_name),
-          h("span", {}, `${v.itemCount} items`),
-          h("span", {}, `${v.questionCount} questions`)
+          h("span", { class: "badge accent" }, c.kind === "roadmap" ? "Roadmap" : "Deck"),
+          c.kind === "roadmap"
+            ? h("span", {}, v.dto.roadmap_name)
+            : h("span", {}, v.dto.deck_name),
+          c.kind === "roadmap"
+            ? h("span", {}, `${v.nodeCount} stages`)
+            : h("span", {}, `${v.itemCount} items`),
+          c.kind !== "roadmap" ? h("span", {}, `${v.questionCount} questions`) : null
         )
       );
 
@@ -233,8 +247,9 @@ export function openImport(prefill = "") {
     }
 
     body.append(
-      promptTemplateSection(),
-      h("label", { class: "field" }, h("span", {}, "Paste JSON (one deck)"), ta),
+      promptDetails("🤖 No content yet? Copy the deck generator prompt for ChatGPT / Claude", PROMPT_TEMPLATE),
+      promptDetails("🗺️ Planning a curriculum? Copy the roadmap generator prompt instead", ROADMAP_PROMPT_TEMPLATE),
+      h("label", { class: "field" }, h("span", {}, "Paste JSON (a deck or a roadmap)"), ta),
       h("div", { class: "row", style: "margin:8px 0" }, validatePasteBtn),
       fileInput,
       h("p", { class: "small muted" }, "Or pick several .json files at once below — each is validated independently, you can drop any before importing, and \"Import\" (top right) imports everything valid in one tap."),
@@ -249,14 +264,20 @@ export function openImport(prefill = "") {
   });
 }
 
-function promptTemplateSection() {
+function promptDetails(summaryText, template) {
   const det = h("details", { class: "q-context" });
+  const promptText = h("textarea", {
+    readOnly: true,
+    value: template,
+    style: "min-height:220px;margin-top:10px",
+    onclick: (e) => e.target.select(),
+  });
   const copyBtn = h(
     "button",
     {
       class: "btn primary",
       onclick: async () => {
-        const ok = await copyText(PROMPT_TEMPLATE);
+        const ok = await copyText(template);
         if (ok) {
           toast("Prompt copied — paste it into ChatGPT or Claude");
         } else {
@@ -268,24 +289,14 @@ function promptTemplateSection() {
     },
     "Copy prompt"
   );
-  const promptText = h("textarea", {
-    readOnly: true,
-    value: PROMPT_TEMPLATE,
-    style: "min-height:220px;margin-top:10px",
-    onclick: (e) => e.target.select(),
-  });
 
   det.append(
-    h(
-      "summary",
-      {},
-      h("span", {}, "🤖 No content yet? Copy the generator prompt for ChatGPT / Claude"),
-    ),
+    h("summary", {}, h("span", {}, summaryText)),
     h("div", { class: "body" }, [
       h(
         "p",
         { class: "small muted", style: "margin-bottom:10px" },
-        "Copy this, paste it into ChatGPT or Claude, add your course excerpt or LeetCode problem below it, and paste the JSON it returns back here."
+        "Copy this, paste it into ChatGPT or Claude, fill in the blanks, and paste the JSON it returns back here."
       ),
       copyBtn,
       promptText,

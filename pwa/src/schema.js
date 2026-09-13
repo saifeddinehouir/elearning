@@ -20,9 +20,49 @@ export function parseDeck(text) {
   }
 
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return { ok: false, error: "Top level must be a JSON object with deck_name, source_type and items." };
+    return { ok: false, error: "Top level must be a JSON object (a deck has deck_name/source_type/items, a roadmap has roadmap_name/nodes)." };
   }
   return { ok: true, dto: data };
+}
+
+// A roadmap JSON has "nodes" (or "roadmap_name") and no "items" — decks have
+// "items" and no "nodes". Used by import.js to route a pasted/dropped file to
+// the right validator without asking the user which kind it is.
+export function detectKind(dto) {
+  if (dto && typeof dto === "object" && (Array.isArray(dto.nodes) || "roadmap_name" in dto)) return "roadmap";
+  return "deck";
+}
+
+export function validateRoadmap(dto) {
+  const issues = [];
+  const err = (path, message) => issues.push({ severity: "error", path, message });
+  const warn = (path, message) => issues.push({ severity: "warning", path, message });
+  const blank = (v) => !v || !String(v).trim();
+
+  if (blank(dto.roadmap_name)) err("roadmap_name", "Roadmap name is empty.");
+  if (!Array.isArray(dto.nodes) || dto.nodes.length === 0) err("nodes", "Roadmap has no nodes.");
+
+  (Array.isArray(dto.nodes) ? dto.nodes : []).forEach((node, i) => {
+    const b = `nodes[${i}]`;
+    if (typeof node !== "object" || node === null) {
+      err(b, "Node is not an object.");
+      return;
+    }
+    if (blank(node.title)) err(`${b}.title`, "Node title is empty.");
+    if (blank(node.description)) warn(`${b}.description`, "No description.");
+  });
+
+  const errors = issues.filter((x) => x.severity === "error");
+  const warnings = issues.filter((x) => x.severity === "warning");
+  const nodes = Array.isArray(dto.nodes) ? dto.nodes : [];
+
+  return {
+    issues,
+    errors,
+    warnings,
+    importable: errors.length === 0,
+    nodeCount: nodes.length,
+  };
 }
 
 export function validateDeck(dto) {

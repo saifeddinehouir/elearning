@@ -260,20 +260,26 @@ export async function findDeckByName(name) {
 }
 
 async function deleteDeckCascade(deckId) {
-  const [items, questions, reviews, attempts, flags] = await Promise.all([
+  const [items, questions, reviews, attempts, flags, roadmaps] = await Promise.all([
     dbGetAllByIndex(STORES.items, "deckId", deckId),
     dbGetAllByIndex(STORES.questions, "deckId", deckId),
     dbGetAllByIndex(STORES.reviewState, "deckId", deckId),
     dbGetAll(STORES.attempts),
     dbGetAllByIndex(STORES.flags, "deckId", deckId),
+    dbGetAll(STORES.roadmaps),
   ]);
   const qIds = new Set(questions.map((q) => q.id));
+  const affectedRoadmaps = roadmaps.filter((r) => r.nodes.some((n) => n.deckId === deckId));
+  for (const r of affectedRoadmaps) {
+    for (const n of r.nodes) if (n.deckId === deckId) n.deckId = null;
+  }
   await Promise.all([
     ...items.map((i) => dbDelete(STORES.items, i.id)),
     ...questions.map((q) => dbDelete(STORES.questions, q.id)),
     ...reviews.map((r) => dbDelete(STORES.reviewState, r.questionId)),
     ...attempts.filter((a) => qIds.has(a.questionId)).map((a) => dbDelete(STORES.attempts, a.id)),
     ...flags.map((f) => dbDelete(STORES.flags, f.questionId)),
+    ...affectedRoadmaps.map((r) => dbPut(STORES.roadmaps, r)),
   ]);
   await dbDelete(STORES.decks, deckId);
 }
@@ -386,6 +392,51 @@ export async function getFlagsMap() {
 }
 
 export const countFlags = () => dbGetAll(STORES.flags).then((r) => r.length);
+
+// ---------- Roadmaps (a named, ordered curriculum; each node optionally points at a deck) ----------
+
+export async function importRoadmap(dto) {
+  const roadmap = {
+    id: uuid(),
+    name: dto.roadmap_name,
+    createdAt: Date.now(),
+    nodes: dto.nodes.map((n) => ({
+      id: uuid(),
+      title: n.title,
+      description: n.description || "",
+      deckId: null,
+    })),
+  };
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+  return roadmap;
+}
+
+export const listRoadmaps = () => dbGetAll(STORES.roadmaps);
+
+// The app only ever surfaces one roadmap at a time (the most recently
+// imported) — multiple are stored so nothing is lost if you import another,
+// but there's no UI yet to switch between them.
+export async function getLatestRoadmap() {
+  const all = await listRoadmaps();
+  if (all.length === 0) return null;
+  return all.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
+}
+
+export async function attachDeckToNode(roadmapId, nodeId, deckId) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  const node = roadmap.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+  node.deckId = deckId;
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+}
+
+export async function deleteRoadmap(roadmapId) {
+  await dbDelete(STORES.roadmaps, roadmapId);
+  emit();
+}
 
 export async function loadSampleDeck(kind) {
   const res = await fetch(`samples/${kind === "leetcode" ? "leetcode" : "course"}.json`);

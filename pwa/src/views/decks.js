@@ -9,16 +9,19 @@ import {
   loadSampleDeck,
   exportDeckJSON,
   countFlags,
+  getLatestRoadmap,
+  attachDeckToNode,
+  deleteRoadmap,
 } from "../store.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
 import { openBrowse, openFlagged } from "./browse.js";
 import { empty } from "./daily.js";
-import { PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
+import { PROMPT_TEMPLATE, ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
 export async function renderDecks() {
-  const [decks, flagCount] = await Promise.all([listDecks(), countFlags()]);
+  const [decks, flagCount, roadmap] = await Promise.all([listDecks(), countFlags(), getLatestRoadmap()]);
   const wrap = h("div", {});
   wrap.appendChild(
     h(
@@ -30,11 +33,11 @@ export async function renderDecks() {
   );
 
   // Always available, not just on the empty state — you need this just as much
-  // once you already have decks and want to generate another one.
+  // once you already have decks/a roadmap and want to generate another one.
   wrap.appendChild(
     h(
       "div",
-      { class: "row", style: "justify-content:center;margin-bottom:14px" },
+      { class: "row", style: "gap:10px;margin-bottom:14px;flex-wrap:wrap" },
       h(
         "button",
         {
@@ -44,12 +47,23 @@ export async function renderDecks() {
             toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
           },
         },
-        "📋 Copy the ChatGPT/Claude prompt"
+        "📋 Copy the deck prompt"
+      ),
+      h(
+        "button",
+        {
+          class: "btn block",
+          onclick: async () => {
+            const ok = await copyText(ROADMAP_PROMPT_TEMPLATE);
+            toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
+          },
+        },
+        "🗺️ Copy the roadmap prompt"
       )
     )
   );
 
-  if (decks.length === 0) {
+  if (decks.length === 0 && !roadmap) {
     wrap.appendChild(
       empty("🗂", "No decks", "Import a JSON deck, or load a sample to try the app.", {
         label: "Import a deck",
@@ -67,7 +81,9 @@ export async function renderDecks() {
     return wrap;
   }
 
-  wrap.appendChild(roadmapSection(decks));
+  wrap.appendChild(pathCard(decks, roadmap));
+
+  if (decks.length === 0) return wrap;
 
   wrap.appendChild(
     h(
@@ -147,63 +163,174 @@ export async function renderDecks() {
   }
 }
 
-// A Duolingo-style vertical path: one node per deck, in the order they were
-// imported, so it reads as "the curriculum you set up" rather than a re-sorted
-// list. The first not-yet-fully-studied deck is the "active" stop.
-function roadmapSection(decks) {
-  const ordered = [...decks].sort((a, b) => a.createdAt - b.createdAt);
-  const activeIdx = ordered.findIndex((d) => d.studiedFraction < 0.999);
+// A Duolingo-style vertical path. If a roadmap has been imported, its named
+// nodes drive the path (in the order the prompt laid them out) and a node
+// with no deck attached yet shows as an open "+" slot you tap to attach one.
+// Otherwise it falls back to one stop per deck, in import order, which is
+// what most people see before they ever bother authoring a roadmap.
+function pathCard(decks, roadmap) {
+  const deckById = new Map(decks.map((d) => [d.id, d]));
+  const entries = roadmap
+    ? roadmap.nodes.map((node) => ({ title: node.title, subtitle: node.description, node, deck: node.deckId ? deckById.get(node.deckId) : null }))
+    : [...decks]
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((d) => ({ title: d.name, subtitle: null, node: null, deck: d }));
+
+  const activeIdx = entries.findIndex((e) => !(e.deck && e.deck.studiedFraction >= 0.999));
 
   const card = h("div", { class: "card" });
-  card.appendChild(h("div", { class: "section-title" }, "Your path"));
-  const path = h("div", { class: "roadmap" });
-
-  ordered.forEach((d, i) => {
-    const pct = Math.round(d.studiedFraction * 100);
-    const done = pct >= 100;
-    const status = done ? "done" : i === activeIdx ? "active" : "todo";
-    const ringColor = done ? "var(--green)" : "var(--accent)";
-
-    const dot = h(
-      "div",
-      { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` },
-      h("div", { class: "roadmap-dot-inner" }, done ? "✓" : String(pct))
-    );
-
-    path.appendChild(
+  const titleRow = h("div", { class: "row between" }, h("div", { class: "section-title" }, roadmap ? roadmap.name : "Your path"));
+  if (roadmap) {
+    titleRow.appendChild(
       h(
+        "button",
+        {
+          class: "btn",
+          style: "padding:4px 9px",
+          "aria-label": "Remove this roadmap",
+          onclick: async () => {
+            if (confirm(`Remove the "${roadmap.name}" roadmap? Attached decks are kept — this only removes this path layout.`)) {
+              await deleteRoadmap(roadmap.id);
+            }
+          },
+        },
+        "✕"
+      )
+    );
+  }
+  card.appendChild(titleRow);
+
+  const path = h("div", { class: "roadmap" });
+  entries.forEach((entry, i) => path.appendChild(pathNode(entry, i === activeIdx)));
+  card.appendChild(path);
+
+  if (!roadmap) {
+    card.appendChild(
+      h(
+        "p",
+        { class: "small muted", style: "margin-top:10px" },
+        "This order is just your import history. Copy the roadmap prompt above for a named, structured path instead."
+      )
+    );
+  }
+  return card;
+
+  function pathNode(entry, isActive) {
+    const { deck, node } = entry;
+
+    if (!deck) {
+      return h(
         "div",
         {
           class: "roadmap-node",
           role: "button",
           tabindex: "0",
-          onclick: () => openDeckDetail(d.id),
+          onclick: () => openAttachDeckPicker(roadmap, node, decks),
           onkeydown: (e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              openDeckDetail(d.id);
+              openAttachDeckPicker(roadmap, node, decks);
             }
           },
         },
-        dot,
+        h("div", { class: `roadmap-dot unattached${isActive ? " active" : ""}` }, h("div", { class: "roadmap-dot-inner" }, "+")),
         h(
           "div",
           { class: "spacer" },
-          h("div", { class: "roadmap-name" }, d.name),
-          h(
-            "div",
-            { class: "row small muted", style: "gap:8px;margin-top:2px" },
-            h("span", {}, `${d.questionCount} questions`),
-            d.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${d.dueCount} due`) : null
-          )
+          h("div", { class: "roadmap-name" }, entry.title),
+          h("div", { class: "small muted", style: "margin-top:2px" }, entry.subtitle || "Tap to attach a deck")
         ),
         h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px" })
-      )
-    );
-  });
+      );
+    }
 
-  card.appendChild(path);
-  return card;
+    const pct = Math.round(deck.studiedFraction * 100);
+    const done = pct >= 100;
+    const status = done ? "done" : isActive ? "active" : "todo";
+    const ringColor = done ? "var(--green)" : "var(--accent)";
+
+    return h(
+      "div",
+      {
+        class: "roadmap-node",
+        role: "button",
+        tabindex: "0",
+        onclick: () => openDeckDetail(deck.id),
+        onkeydown: (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openDeckDetail(deck.id);
+          }
+        },
+      },
+      h(
+        "div",
+        { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` },
+        h("div", { class: "roadmap-dot-inner" }, done ? "✓" : String(pct))
+      ),
+      h(
+        "div",
+        { class: "spacer" },
+        h("div", { class: "roadmap-name" }, entry.title),
+        h(
+          "div",
+          { class: "row small muted", style: "gap:8px;margin-top:2px" },
+          h("span", {}, `${deck.questionCount} questions`),
+          deck.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${deck.dueCount} due`) : null
+        )
+      ),
+      h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px" })
+    );
+  }
+}
+
+function openAttachDeckPicker(roadmap, node, decks) {
+  openOverlay((close) => {
+    const overlay = h("div", { class: "overlay" });
+    const head = h("div", { class: "o-head" });
+    const body = h("div", { class: "o-body" });
+    overlay.append(head, body);
+    head.append(
+      h("button", { class: "btn", onclick: close }, "Cancel"),
+      h("strong", {}, `Attach a deck`),
+      h("div", { class: "spacer" })
+    );
+
+    body.appendChild(h("p", { class: "small muted", style: "margin-bottom:12px" }, `For the "${node.title}" stage of your roadmap.`));
+
+    if (decks.length === 0) {
+      body.appendChild(
+        empty(
+          "🗂",
+          "No decks yet",
+          `Generate a deck for "${node.title}" with the deck prompt, import it, then come back here to attach it.`,
+          { label: "Import a deck", onclick: () => openImport() }
+        )
+      );
+    } else {
+      const list = h("div", { class: "card tight" });
+      for (const d of decks) {
+        list.appendChild(
+          h(
+            "button",
+            {
+              class: "list-row tappable",
+              style: "width:100%;text-align:left",
+              onclick: async () => {
+                await attachDeckToNode(roadmap.id, node.id, d.id);
+                toast(`Attached "${d.name}"`);
+                close();
+              },
+            },
+            h("span", { class: "label" }, d.name),
+            h("span", { class: "value" }, `${d.questionCount} questions`)
+          )
+        );
+      }
+      body.appendChild(list);
+    }
+    return overlay;
+  });
 }
 
 async function openDeckDetail(deckId) {

@@ -42,6 +42,33 @@ Deck name: <name>
 Material:
 <paste course excerpt or LeetCode problem statement here>`;
 
+// Companion prompt: outlines a curriculum as an ordered list of stages
+// (a "roadmap") rather than a full deck. Import this first to lay out the
+// path, then generate one deck per node with PROMPT_TEMPLATE above and
+// attach it to that node from the Decks tab.
+export const ROADMAP_PROMPT_TEMPLATE = `You are outlining a study curriculum as an ordered roadmap for a spaced-repetition quiz app. Output ONLY valid JSON (no markdown fence, no commentary) matching exactly this schema:
+
+{
+  "roadmap_name": "string",
+  "nodes": [
+    {
+      "title": "string (a short stage name, e.g. \\"Java Collections\\")",
+      "description": "1-2 sentences on what this stage covers and why it comes at this point in the sequence"
+    }
+  ]
+}
+
+Rules:
+- Order nodes the way someone should actually learn them — earlier nodes are prerequisites for later ones.
+- 5-12 nodes is typical. Each node should be narrow enough to become a single study deck later (a few hours of material, not a whole subject).
+- Do NOT include questions or content here — this is just the outline. Decks for each node are generated separately.
+- title should be short enough to use as a deck name later.
+
+Topic: <the overall subject, e.g. "Backend interview prep in Java/Spring">
+
+Notes:
+<anything about your background, target role, timeline, or topics to emphasize/skip>`;
+
 // Clipboard write with a manual-select fallback for browsers/contexts that
 // block the async Clipboard API (e.g. no permission prompt available).
 export async function copyText(text) {

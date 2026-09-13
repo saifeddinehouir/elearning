@@ -386,6 +386,15 @@ label.field > span { display: block; font-size: 0.82rem; color: var(--text-dim);
 }
 .roadmap-dot.todo .roadmap-dot-inner { color: var(--text-faint); }
 .roadmap-dot.done .roadmap-dot-inner { color: var(--green); font-size: 1.05rem; }
+.roadmap-dot.unattached { background: var(--surface); border: 2px dashed var(--border); }
+.roadmap-dot.unattached.active { border-color: var(--accent); }
+.roadmap-dot.unattached .roadmap-dot-inner {
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.roadmap-dot.unattached.active .roadmap-dot-inner { color: var(--accent); }
 
 /* ---------- Progress ---------- */
 .progress { height: 7px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
