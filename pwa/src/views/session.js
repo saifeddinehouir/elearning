@@ -1,15 +1,28 @@
-import { h, clear, openOverlay } from "../dom.js";
+import { h, clear, openOverlay, toast, ICONS } from "../dom.js";
 import { composeSession } from "../session.js";
-import { recordAnswer, finishSession } from "../store.js";
+import { recordAnswer, finishSession, getFlagState, setFlagState } from "../store.js";
 import { pct } from "../format.js";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
+const FLAG_CYCLE = { none: "confusing", confusing: "wrong", wrong: null };
 
 export function startSession(pool, config) {
   const { queue } = composeSession(pool, config);
   if (queue.length === 0) return;
 
-  const state = { queue, index: 0, correct: 0, chosen: null, revealed: false, feedback: null, done: false };
+  // history[i] holds the recorded answer for a question once it's been submitted,
+  // so navigating Back re-shows it (revealed, read-only) instead of re-grading it.
+  const state = {
+    queue,
+    viewIndex: 0,
+    maxIndex: 0,
+    correct: 0,
+    chosen: null,
+    revealed: false,
+    feedback: null,
+    done: false,
+    history: new Array(queue.length).fill(null),
+  };
 
   openOverlay((close) => {
     const overlay = h("div", { class: "overlay" });
@@ -21,8 +34,22 @@ export function startSession(pool, config) {
     overlay.append(head, bar, body, foot);
 
     const endBtn = h("button", { class: "btn", onclick: () => confirmEnd(close) }, "End");
+    const backBtn = h("button", {
+      class: "btn",
+      style: "padding:10px",
+      html: ICONS.chevronLeft,
+      "aria-label": "Previous question",
+      onclick: goBack,
+    });
+    const flagBtn = h("button", {
+      class: "btn",
+      style: "padding:10px",
+      html: ICONS.flag,
+      "aria-label": "Flag question",
+      onclick: cycleFlag,
+    });
     const counter = h("strong", {}, "");
-    head.append(endBtn, counter, h("div", { class: "spacer" }));
+    head.append(endBtn, backBtn, counter, h("div", { class: "spacer" }), flagBtn);
 
     function confirmEnd(closeFn) {
       if (state.done) return closeFn();
@@ -30,35 +57,73 @@ export function startSession(pool, config) {
     }
 
     function paintProgress() {
-      counter.textContent = `${Math.min(state.index + 1, state.queue.length)} / ${state.queue.length}`;
-      bar.firstChild.style.width = `${(state.index / state.queue.length) * 100}%`;
+      counter.textContent = `${state.viewIndex + 1} / ${state.queue.length}`;
+      bar.firstChild.style.width = `${(state.maxIndex / state.queue.length) * 100}%`;
+      backBtn.disabled = state.viewIndex === 0;
+    }
+
+    async function paintFlag() {
+      const q = state.queue[state.viewIndex];
+      const reason = await getFlagState(q.id);
+      flagBtn.dataset.reason = reason || "none";
+      flagBtn.className = `btn ${reason === "wrong" ? "danger" : reason === "confusing" ? "primary" : ""}`;
+    }
+
+    async function cycleFlag() {
+      const q = state.queue[state.viewIndex];
+      const current = flagBtn.dataset.reason || "none";
+      const next = FLAG_CYCLE[current];
+      await setFlagState(q, next);
+      await paintFlag();
+      toast(next ? `Flagged: ${next}` : "Flag removed");
+    }
+
+    function loadFromHistory() {
+      const rec = state.history[state.viewIndex];
+      if (rec) {
+        state.chosen = rec.chosen;
+        state.revealed = true;
+        state.feedback = rec.feedback;
+      } else {
+        state.chosen = null;
+        state.revealed = false;
+        state.feedback = null;
+      }
     }
 
     async function submit() {
       if (state.chosen == null || state.revealed) return;
       state.revealed = true;
-      const q = state.queue[state.index];
+      const q = state.queue[state.viewIndex];
       state.feedback = await recordAnswer(q, state.chosen);
       if (state.feedback.correct) state.correct += 1;
+      state.history[state.viewIndex] = { chosen: state.chosen, feedback: state.feedback };
       renderQuestion();
     }
 
-    async function next() {
-      state.index += 1;
-      state.chosen = null;
-      state.revealed = false;
-      state.feedback = null;
-      if (state.index >= state.queue.length) {
+    function goBack() {
+      if (state.viewIndex === 0) return;
+      state.viewIndex -= 1;
+      loadFromHistory();
+      renderQuestion();
+    }
+
+    async function goNext() {
+      if (state.viewIndex >= state.queue.length - 1) {
         await finishSession(state.queue.length, state.correct);
         renderSummary();
-      } else {
-        renderQuestion();
+        return;
       }
+      state.viewIndex += 1;
+      state.maxIndex = Math.max(state.maxIndex, state.viewIndex);
+      loadFromHistory();
+      renderQuestion();
     }
 
     function renderQuestion() {
       paintProgress();
-      const q = state.queue[state.index];
+      paintFlag();
+      const q = state.queue[state.viewIndex];
       clear(body);
 
       body.appendChild(
@@ -129,9 +194,9 @@ export function startSession(pool, config) {
           {
             class: "btn primary block lg",
             disabled: !state.revealed && state.chosen == null,
-            onclick: () => (state.revealed ? next() : submit()),
+            onclick: () => (state.revealed ? goNext() : submit()),
           },
-          state.revealed ? (state.index + 1 >= state.queue.length ? "Finish" : "Next") : "Check answer"
+          state.revealed ? (state.viewIndex + 1 >= state.queue.length ? "Finish" : "Next") : "Check answer"
         )
       );
     }
@@ -141,6 +206,8 @@ export function startSession(pool, config) {
       bar.firstChild.style.width = "100%";
       counter.textContent = "Done";
       endBtn.textContent = "Close";
+      backBtn.style.display = "none";
+      flagBtn.style.display = "none";
       clear(body);
       clear(foot);
       const answered = state.queue.length;

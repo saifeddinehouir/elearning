@@ -8,15 +8,17 @@ import {
   getSettings,
   loadSampleDeck,
   exportDeckJSON,
+  countFlags,
 } from "../store.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
+import { openBrowse, openFlagged } from "./browse.js";
 import { empty } from "./daily.js";
 import { PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
 export async function renderDecks() {
-  const decks = await listDecks();
+  const [decks, flagCount] = await Promise.all([listDecks(), countFlags()]);
   const wrap = h("div", {});
   wrap.appendChild(
     h(
@@ -64,6 +66,25 @@ export async function renderDecks() {
     );
     return wrap;
   }
+
+  wrap.appendChild(
+    h(
+      "div",
+      { class: "row", style: "gap:10px;margin-bottom:14px" },
+      h(
+        "button",
+        { class: "btn block", onclick: () => openBrowse() },
+        h("span", { html: ICONS.search, style: "width:16px;height:16px;display:inline-flex" }),
+        "Search questions"
+      ),
+      h(
+        "button",
+        { class: "btn block", onclick: () => openFlagged() },
+        h("span", { html: ICONS.flag, style: "width:16px;height:16px;display:inline-flex" }),
+        flagCount > 0 ? `Flagged (${flagCount})` : "Flagged"
+      )
+    )
+  );
 
   for (const d of decks) {
     const card = h("div", {

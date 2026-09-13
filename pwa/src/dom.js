@@ -66,4 +66,7 @@ export const ICONS = {
   code: icon('<polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/>'),
   chevron: icon('<polyline points="9 6 15 12 9 18"/>'),
   theme: icon('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  search: icon('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
+  flag: icon('<path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/>'),
+  chevronLeft: icon('<polyline points="15 6 9 12 15 18"/>'),
 };

@@ -192,6 +192,7 @@ async function buildPool(filterFn) {
 
 export const getDailyPool = () => buildPool((d) => d.includeInMix !== false);
 export const getDeckPool = (deckId) => buildPool((d) => d.id === deckId);
+export const getAllQuestionsFlat = () => buildPool(() => true);
 
 export const getAllAttempts = () => dbGetAll(STORES.attempts);
 export const getAllStudyDays = () => dbGetAll(STORES.studyDays);
@@ -259,11 +260,12 @@ export async function findDeckByName(name) {
 }
 
 async function deleteDeckCascade(deckId) {
-  const [items, questions, reviews, attempts] = await Promise.all([
+  const [items, questions, reviews, attempts, flags] = await Promise.all([
     dbGetAllByIndex(STORES.items, "deckId", deckId),
     dbGetAllByIndex(STORES.questions, "deckId", deckId),
     dbGetAllByIndex(STORES.reviewState, "deckId", deckId),
     dbGetAll(STORES.attempts),
+    dbGetAllByIndex(STORES.flags, "deckId", deckId),
   ]);
   const qIds = new Set(questions.map((q) => q.id));
   await Promise.all([
@@ -271,6 +273,7 @@ async function deleteDeckCascade(deckId) {
     ...questions.map((q) => dbDelete(STORES.questions, q.id)),
     ...reviews.map((r) => dbDelete(STORES.reviewState, r.questionId)),
     ...attempts.filter((a) => qIds.has(a.questionId)).map((a) => dbDelete(STORES.attempts, a.id)),
+    ...flags.map((f) => dbDelete(STORES.flags, f.questionId)),
   ]);
   await dbDelete(STORES.decks, deckId);
 }
@@ -350,6 +353,39 @@ export async function importDeck(dto, resolution) {
   emit();
   return { deck, itemCount: items.length, questionCount: questions.length };
 }
+
+// ---------- Flags (mark a question "confusing" / "wrong" for later review) ----------
+
+// reason: "confusing" | "wrong" | null (null clears the flag)
+export async function setFlagState(question, reason) {
+  if (!reason) {
+    await dbDelete(STORES.flags, question.id);
+    emit();
+    return null;
+  }
+  const existing = await dbGet(STORES.flags, question.id);
+  const rec = {
+    questionId: question.id,
+    deckId: question.deckId,
+    reason,
+    createdAt: existing ? existing.createdAt : Date.now(),
+  };
+  await dbPut(STORES.flags, rec);
+  emit();
+  return rec;
+}
+
+export async function getFlagState(questionId) {
+  const rec = await dbGet(STORES.flags, questionId);
+  return rec ? rec.reason : null;
+}
+
+export async function getFlagsMap() {
+  const flags = await dbGetAll(STORES.flags);
+  return new Map(flags.map((f) => [f.questionId, f]));
+}
+
+export const countFlags = () => dbGetAll(STORES.flags).then((r) => r.length);
 
 export async function loadSampleDeck(kind) {
   const res = await fetch(`samples/${kind === "leetcode" ? "leetcode" : "course"}.json`);
