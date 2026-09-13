@@ -82,4 +82,5 @@ export const ICONS = {
   search: icon('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
   flag: icon('<path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/>'),
   chevronLeft: icon('<polyline points="15 6 9 12 15 18"/>'),
+  map: icon('<polygon points="3 6 9 4 15 6 21 4 21 18 15 20 9 18 3 20 3 6"/><line x1="9" y1="4" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="20"/>'),
 };
