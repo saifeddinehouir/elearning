@@ -11,6 +11,41 @@ export function openSettings() {
     overlay.append(head, body);
     head.append(h("button", { class: "btn", onclick: close }, "Done"), h("strong", {}, "Settings"), h("div", { class: "spacer" }));
 
+    // ---------- Appearance ----------
+    body.appendChild(h("div", { class: "section-header" }, "Appearance"));
+    const appearanceList = h("div", { class: "list" });
+    appearanceList.appendChild(row(ICONS.theme, "c-purple", "Theme", []));
+    body.appendChild(appearanceList);
+
+    const themeWrap = h("div", { class: "list", style: "padding:12px 16px" });
+    const themeControl = h("div", { class: "segmented" });
+    const themeButtons = [];
+    for (const [val, label] of [
+      ["system", "System"],
+      ["light", "Light"],
+      ["dark", "Dark"],
+    ]) {
+      const btn = h(
+        "button",
+        {
+          class: (s.theme || "system") === val ? "active" : "",
+          onclick: () => {
+            setSettings({ theme: val });
+            for (const b of themeButtons) b.classList.toggle("active", b.dataset.val === val);
+          },
+        },
+        label
+      );
+      btn.dataset.val = val;
+      themeButtons.push(btn);
+      themeControl.appendChild(btn);
+    }
+    themeWrap.appendChild(themeControl);
+    body.appendChild(themeWrap);
+    body.appendChild(
+      h("p", { class: "list-footnote" }, "System follows your phone's appearance setting.")
+    );
+
     // ---------- Daily session ----------
     body.appendChild(h("div", { class: "section-header" }, "Daily session"));
     const sessionList = h("div", { class: "list" });

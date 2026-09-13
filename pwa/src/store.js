@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
   reminderEnabled: true,
   reminderHour: 19,
   reminderMinute: 0,
+  theme: "system", // "system" | "light" | "dark"
 };
 
 export function getSettings() {

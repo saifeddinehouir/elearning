@@ -65,4 +65,5 @@ export const ICONS = {
   book: icon('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'),
   code: icon('<polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/>'),
   chevron: icon('<polyline points="9 6 15 12 9 18"/>'),
+  theme: icon('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
 };

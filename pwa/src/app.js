@@ -1,5 +1,5 @@
 import { h, clear, ICONS } from "./dom.js";
-import { onChange } from "./store.js";
+import { onChange, getSettings } from "./store.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 
@@ -17,6 +17,15 @@ const TABS = [
 
 const appRoot = document.getElementById("app");
 let current = tabFromHash();
+
+function applyTheme() {
+  const { theme } = getSettings();
+  if (theme === "light" || theme === "dark") {
+    document.documentElement.dataset.theme = theme;
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+}
 
 function tabFromHash() {
   const id = (location.hash || "").replace(/^#\/?/, "");
@@ -93,7 +102,10 @@ window.addEventListener("hashchange", () => {
   }
 });
 
-onChange(() => render());
+onChange(() => {
+  applyTheme();
+  render();
+});
 
 startNudgeWatcher(() => {
   if (!nudged) {
@@ -108,4 +120,5 @@ registerServiceWorker().then(() => {
     render();
   });
 });
+applyTheme();
 render();

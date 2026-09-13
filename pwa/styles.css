@@ -1,5 +1,9 @@
+/* Dark is the default palette (bare :root). Light overrides apply either when
+   the OS is in light mode and the user hasn't forced dark (the media-query
+   block), or when the user explicitly picked Light in Settings
+   ([data-theme="light"]). Brand/semantic colors (accent, green, red, orange,
+   purple, teal) stay the same across both themes on purpose. */
 :root {
-  /* ---- palette (unchanged) ---- */
   --bg: #0f1115;
   --surface: #171a21;
   --surface-2: #1f232c;
@@ -18,7 +22,6 @@
   --purple: #a06bff;
   --teal: #38c6c6;
 
-  /* ---- system tokens ---- */
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -28,7 +31,42 @@
   --ease: cubic-bezier(0.22, 0.8, 0.36, 1);
   --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.24), 0 8px 20px -10px rgba(0, 0, 0, 0.55);
   --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.3), 0 20px 40px -16px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f3f6;
+    --surface: #ffffff;
+    --surface-2: #eef0f4;
+    --surface-3: #e3e6ec;
+    --border: #dfe2e8;
+    --border-soft: #e8eaee;
+    --text: #14161c;
+    --text-dim: #5c626f;
+    --text-faint: #8a909c;
+    --shadow-1: 0 1px 1px rgba(20, 22, 28, 0.04), 0 8px 20px -12px rgba(20, 22, 28, 0.18);
+    --shadow-2: 0 2px 6px rgba(20, 22, 28, 0.06), 0 20px 40px -16px rgba(20, 22, 28, 0.24);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f2f3f6;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --surface-3: #e3e6ec;
+  --border: #dfe2e8;
+  --border-soft: #e8eaee;
+  --text: #14161c;
+  --text-dim: #5c626f;
+  --text-faint: #8a909c;
+  --shadow-1: 0 1px 1px rgba(20, 22, 28, 0.04), 0 8px 20px -12px rgba(20, 22, 28, 0.18);
+  --shadow-2: 0 2px 6px rgba(20, 22, 28, 0.06), 0 20px 40px -16px rgba(20, 22, 28, 0.24);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
