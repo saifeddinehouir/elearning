@@ -10,10 +10,17 @@ export function openImport(prefill = "") {
     const body = h("div", { class: "o-body" });
     overlay.append(head, body);
 
+    const importBtn = h(
+      "button",
+      { class: "btn primary", disabled: true, onclick: () => runImportAll() },
+      "Import"
+    );
+
     head.append(
       h("button", { class: "btn", onclick: close }, "Close"),
       h("strong", {}, "Import decks"),
-      h("div", { class: "spacer" })
+      h("div", { class: "spacer" }),
+      importBtn
     );
 
     // Each candidate: { id, label, parseError, validation, resolution, clashName }
@@ -85,7 +92,7 @@ export function openImport(prefill = "") {
     }
 
     async function runImportAll() {
-      const importable = [...candidates.values()].filter((c) => c.validation?.isImportable);
+      const importable = [...candidates.values()].filter((c) => c.validation?.importable);
       if (importable.length === 0) return;
 
       const replacing = importable.filter((c) => c.resolution === "replace" && c.clashName);
@@ -119,24 +126,18 @@ export function openImport(prefill = "") {
       clear(resultsList);
 
       const list = [...candidates.values()];
-      const validCount = list.filter((c) => c.validation?.isImportable).length;
+      const validCount = list.filter((c) => c.validation?.importable).length;
+
+      importBtn.disabled = validCount === 0;
+      importBtn.textContent = validCount > 0 ? `Import (${validCount})` : "Import";
 
       summaryBar.appendChild(
         h(
           "button",
-          { class: "btn", onclick: () => fileInput.click() },
+          { class: "btn block", onclick: () => fileInput.click() },
           list.length ? "Add more .json files" : "Choose .json file(s)"
         )
       );
-      if (validCount > 0) {
-        summaryBar.appendChild(
-          h(
-            "button",
-            { class: "btn primary", onclick: runImportAll },
-            `Import ${validCount} deck${validCount === 1 ? "" : "s"}`
-          )
-        );
-      }
 
       for (const c of list) resultsList.appendChild(candidateCard(c));
     }
@@ -165,7 +166,7 @@ export function openImport(prefill = "") {
       card.appendChild(
         h(
           "div",
-          { class: "meta", style: "margin-top:6px" },
+          { class: "row small muted", style: "margin-top:6px;flex-wrap:wrap;gap:10px" },
           h("span", {}, v.dto.deck_name),
           h("span", {}, `${v.itemCount} items`),
           h("span", {}, `${v.questionCount} questions`)
@@ -198,7 +199,7 @@ export function openImport(prefill = "") {
         );
       }
 
-      if (c.clashName && v.isImportable) {
+      if (c.clashName && v.importable) {
         const pick = h("div", { style: "margin-top:10px" });
         pick.appendChild(
           h("div", { class: "small", style: "color:var(--orange)" }, `⚠️ "${c.clashName}" already exists`)
@@ -236,7 +237,7 @@ export function openImport(prefill = "") {
       h("label", { class: "field" }, h("span", {}, "Paste JSON (one deck)"), ta),
       h("div", { class: "row", style: "margin:8px 0" }, validatePasteBtn),
       fileInput,
-      h("p", { class: "small muted" }, "Or pick several .json files at once below — each is validated independently and you can drop any of them before importing."),
+      h("p", { class: "small muted" }, "Or pick several .json files at once below — each is validated independently, you can drop any before importing, and \"Import\" (top right) imports everything valid in one tap."),
       summaryBar,
       resultsList
     );

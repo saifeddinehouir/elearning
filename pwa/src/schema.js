@@ -84,6 +84,9 @@ export function validateDeck(dto) {
     issues,
     errors,
     warnings,
+    // NB: named `importable`, not `isImportable` — views/import.js and
+    // views/decks.js key off this exact name; a rename here silently breaks
+    // the Import button (it did once — see git history).
     importable: errors.length === 0,
     itemCount: items.length,
     questionCount: items.reduce((s, it) => s + (Array.isArray(it && it.questions) ? it.questions.length : 0), 0),
