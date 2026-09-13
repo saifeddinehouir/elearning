@@ -31,6 +31,7 @@
   --ease: cubic-bezier(0.22, 0.8, 0.36, 1);
   --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.24), 0 8px 20px -10px rgba(0, 0, 0, 0.55);
   --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.3), 0 20px 40px -16px rgba(0, 0, 0, 0.6);
+  --ambient: 9%;
   color-scheme: dark;
 }
 
@@ -47,6 +48,7 @@
     --text-faint: #8a909c;
     --shadow-1: 0 1px 1px rgba(20, 22, 28, 0.04), 0 8px 20px -12px rgba(20, 22, 28, 0.18);
     --shadow-2: 0 2px 6px rgba(20, 22, 28, 0.06), 0 20px 40px -16px rgba(20, 22, 28, 0.24);
+    --ambient: 13%;
     color-scheme: light;
   }
 }
@@ -63,22 +65,43 @@
   --text-faint: #8a909c;
   --shadow-1: 0 1px 1px rgba(20, 22, 28, 0.04), 0 8px 20px -12px rgba(20, 22, 28, 0.18);
   --shadow-2: 0 2px 6px rgba(20, 22, 28, 0.06), 0 20px 40px -16px rgba(20, 22, 28, 0.24);
+  --ambient: 13%;
   color-scheme: light;
 }
 
-:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] { --ambient: 9%; color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
+html {
+  /* Canvas fallback (overscroll bounce, etc). #bg paints the actual ambient
+     gradient; body itself is left transparent so #bg shows through it —
+     a fixed, negative-z-index sibling renders BEHIND body's own opaque
+     background in the root stacking context, so that approach doesn't work. */
   background: var(--bg);
+}
+html, body {
   color: var(--text);
   font: 1rem/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
 
-body { min-height: 100dvh; }
+/* Fixed to the viewport (not the document) so the ambient glow reaches every
+   screen evenly regardless of how tall the page's content is. Placed first
+   in the DOM with no z-index so it paints behind #app at the same stack
+   level, in tree order. */
+#bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(500px 420px at 6% 4%, color-mix(in srgb, var(--accent) var(--ambient), transparent), transparent 70%),
+    radial-gradient(480px 440px at 98% 26%, color-mix(in srgb, var(--purple) var(--ambient), transparent), transparent 68%),
+    radial-gradient(560px 480px at 18% 96%, color-mix(in srgb, var(--teal) var(--ambient), transparent), transparent 72%);
+}
+
+body { min-height: 100dvh; background: transparent; }
 
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; -webkit-tap-highlight-color: transparent; }
@@ -402,7 +425,7 @@ label.field > span { display: block; font-size: 0.82rem; color: var(--text-dim);
 .deck:active { transform: scale(0.99); }
 .deck + .deck { margin-top: 12px; }
 .deck h3 { font-size: 1.06rem; font-weight: 700; letter-spacing: -0.01em; }
-.deck .meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--text-dim); font-size: 0.78rem; margin: 7px 0 10px; }
+.meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--text-dim); font-size: 0.78rem; margin: 7px 0 10px; }
 
 /* ---------- Toast ---------- */
 #toast-root { position: fixed; left: 0; right: 0; bottom: calc(var(--tab-h) + var(--safe-b) + 14px); display: flex; justify-content: center; z-index: 200; pointer-events: none; }

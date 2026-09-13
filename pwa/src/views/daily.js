@@ -47,13 +47,14 @@ export async function renderDaily() {
   const today = studyDays.find((d) => sameDay(d.dayStart));
   const answeredToday = today ? today.answered : 0;
 
+  const streakN = currentStreak(studyDays);
   wrap.appendChild(
     h(
       "div",
       { class: "tiles" },
-      tile(currentStreak(studyDays), "Day streak"),
-      tile(`${answeredToday}/${settings.dailyGoal}`, "Answered today"),
-      tile(comp.total, "In queue")
+      tile(streakN, "Day streak", streakN > 0 ? "var(--orange)" : null),
+      tile(`${answeredToday}/${settings.dailyGoal}`, "Answered today", answeredToday > 0 ? "var(--accent)" : null),
+      tile(comp.total, "In queue", comp.total > 0 ? "var(--purple)" : null)
     )
   );
 
@@ -87,8 +88,13 @@ export async function renderDaily() {
 
 const sameDay = (ms) => new Date(ms).toDateString() === new Date().toDateString();
 
-function tile(value, label) {
-  return h("div", { class: "tile" }, h("div", { class: "v" }, String(value)), h("div", { class: "l" }, label));
+function tile(value, label, color) {
+  return h(
+    "div",
+    { class: "tile" },
+    h("div", { class: "v", style: color ? `color:${color}` : "" }, String(value)),
+    h("div", { class: "l" }, label)
+  );
 }
 
 function compRow(color, label, n) {

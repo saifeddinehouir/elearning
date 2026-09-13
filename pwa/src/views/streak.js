@@ -9,13 +9,16 @@ export async function renderStreak() {
   const wrap = h("div", {});
   wrap.appendChild(h("h1", { class: "screen-title" }, "Streak"));
 
+  const curStreak = currentStreak(studyDays);
+  const longStreak = longestStreak(studyDays);
+  const daysStudied = totalDaysStudied(studyDays);
   wrap.appendChild(
     h(
       "div",
       { class: "tiles" },
-      tile(currentStreak(studyDays), "Current streak"),
-      tile(longestStreak(studyDays), "Longest streak"),
-      tile(totalDaysStudied(studyDays), "Days studied")
+      tile(curStreak, "Current streak", curStreak > 0 ? "var(--orange)" : null),
+      tile(longStreak, "Longest streak", longStreak > 0 ? "var(--orange)" : null),
+      tile(daysStudied, "Days studied", daysStudied > 0 ? "var(--accent)" : null)
     )
   );
 
@@ -54,6 +57,11 @@ export async function renderStreak() {
   return wrap;
 }
 
-function tile(value, label) {
-  return h("div", { class: "tile" }, h("div", { class: "v" }, String(value)), h("div", { class: "l" }, label));
+function tile(value, label, color) {
+  return h(
+    "div",
+    { class: "tile" },
+    h("div", { class: "v", style: color ? `color:${color}` : "" }, String(value)),
+    h("div", { class: "l" }, label)
+  );
 }
