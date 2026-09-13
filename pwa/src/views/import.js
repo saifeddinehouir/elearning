@@ -12,159 +12,236 @@ export function openImport(prefill = "") {
 
     head.append(
       h("button", { class: "btn", onclick: close }, "Close"),
-      h("strong", {}, "Import deck"),
+      h("strong", {}, "Import decks"),
       h("div", { class: "spacer" })
     );
 
-    let text = prefill;
-    let validation = null;
-    // Default to the non-destructive choice: a name clash should never silently
-    // delete an existing deck's history unless the user deliberately picks that.
-    let resolution = "copy";
+    // Each candidate: { id, label, parseError, validation, resolution, clashName }
+    // "id" is "paste" for the textarea, or the filename for a picked file.
+    const candidates = new Map();
+    let pasteText = prefill;
 
     const ta = h("textarea", {
       placeholder: '{ "deck_name": "...", "source_type": "course", "items": [ ... ] }',
       value: prefill,
       oninput: (e) => {
-        text = e.target.value;
-        validation = null;
-        paint();
+        pasteText = e.target.value;
+        validatePasteBtn.disabled = !pasteText.trim();
       },
     });
+
+    const validatePasteBtn = h(
+      "button",
+      {
+        class: "btn primary",
+        disabled: !pasteText.trim(),
+        onclick: () => addCandidate("paste", "Pasted JSON", pasteText),
+      },
+      "Validate"
+    );
 
     const fileInput = h("input", {
       type: "file",
       accept: ".json,application/json",
+      multiple: true,
       style: "display:none",
       onchange: async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        text = await file.text();
-        ta.value = text;
-        validation = null;
-        runValidate();
+        const files = Array.from(e.target.files || []);
+        for (const file of files) {
+          const text = await file.text();
+          await addCandidate(file.name, file.name, text);
+        }
+        e.target.value = ""; // lets picking the exact same file(s) again work
       },
     });
 
-    const result = h("div", {});
+    const summaryBar = h("div", { class: "row", style: "gap:10px;margin:12px 0;flex-wrap:wrap" });
+    const resultsList = h("div", {});
 
-    function runValidate() {
+    async function addCandidate(id, label, text) {
       const parsed = parseDeck(text);
-      if (!parsed.ok) {
-        validation = { parseError: parsed.error };
-      } else {
+      const existing = candidates.get(id);
+      let validation = null;
+      let clashName = null;
+      if (parsed.ok) {
         validation = { ...validateDeck(parsed.dto), dto: parsed.dto };
+        const clash = await findDeckByName(parsed.dto.deck_name);
+        clashName = clash ? clash.name : null;
       }
+      candidates.set(id, {
+        id,
+        label,
+        parseError: parsed.ok ? null : parsed.error,
+        validation,
+        resolution: existing?.resolution || "copy",
+        clashName,
+      });
       paint();
     }
 
-    async function runImport() {
-      if (!validation || !validation.importable) return;
-      if (resolution === "replace") {
+    function removeCandidate(id) {
+      candidates.delete(id);
+      paint();
+    }
+
+    async function runImportAll() {
+      const importable = [...candidates.values()].filter((c) => c.validation?.isImportable);
+      if (importable.length === 0) return;
+
+      const replacing = importable.filter((c) => c.resolution === "replace" && c.clashName);
+      if (replacing.length > 0) {
+        const names = replacing.map((c) => `"${c.clashName}"`).join(", ");
         const ok = confirm(
-          `Replace "${validation.dto.deck_name}"? This permanently deletes its current items, questions, review schedule and answer history. This can't be undone.`
+          `Replace ${names}? This permanently deletes ${replacing.length === 1 ? "its" : "their"} current items, questions, review schedule and answer history. This can't be undone.`
         );
         if (!ok) return;
       }
-      const r = await importDeck(validation.dto, resolution);
-      toast(`Imported ${r.deck.name} — ${r.itemCount} items, ${r.questionCount} questions`);
+
+      let imported = 0;
+      for (const c of importable) {
+        try {
+          await importDeck(c.validation.dto, c.resolution);
+          imported += 1;
+        } catch (err) {
+          console.error("Import failed for", c.label, err);
+        }
+      }
+      const skipped = candidates.size - imported;
+      toast(
+        `Imported ${imported} deck${imported === 1 ? "" : "s"}` +
+          (skipped > 0 ? ` — ${skipped} skipped (fix errors first)` : "")
+      );
       close();
     }
 
-    async function paint() {
-      clear(result);
+    function paint() {
+      clear(summaryBar);
+      clear(resultsList);
 
-      const actions = h("div", { class: "row", style: "gap:10px;margin:12px 0" });
-      actions.appendChild(h("button", { class: "btn", onclick: () => fileInput.click() }, "Choose .json file"));
-      if (!validation) {
-        actions.appendChild(
-          h("button", { class: "btn primary", disabled: !text.trim(), onclick: runValidate }, "Validate")
+      const list = [...candidates.values()];
+      const validCount = list.filter((c) => c.validation?.isImportable).length;
+
+      summaryBar.appendChild(
+        h(
+          "button",
+          { class: "btn", onclick: () => fileInput.click() },
+          list.length ? "Add more .json files" : "Choose .json file(s)"
+        )
+      );
+      if (validCount > 0) {
+        summaryBar.appendChild(
+          h(
+            "button",
+            { class: "btn primary", onclick: runImportAll },
+            `Import ${validCount} deck${validCount === 1 ? "" : "s"}`
+          )
         );
-      } else if (validation.importable) {
-        actions.appendChild(h("button", { class: "btn primary", onclick: runImport }, "Import"));
       }
-      result.appendChild(actions);
 
-      if (validation?.parseError) {
-        result.appendChild(h("div", { class: "issue error" }, validation.parseError));
-        return;
-      }
-      if (!validation) return;
+      for (const c of list) resultsList.appendChild(candidateCard(c));
+    }
 
-      const v = validation;
-      result.appendChild(
+    function candidateCard(c) {
+      const card = h("div", { class: "card tight" });
+      card.appendChild(
         h(
           "div",
-          { class: "card tight" },
-          row("Name", v.dto.deck_name),
-          row("Source", v.dto.source_type),
-          row("Items", String(v.itemCount)),
-          row("Questions", String(v.questionCount)),
-          row("Topics", v.topics.join(", "))
+          { class: "row between" },
+          h("strong", { class: "small" }, c.label),
+          h(
+            "button",
+            { class: "btn", style: "padding:2px 9px", onclick: () => removeCandidate(c.id) },
+            "✕"
+          )
         )
       );
 
-      if (v.errors.length) {
-        result.appendChild(section("Errors — fix before importing", v.errors, "error"));
-      }
-      if (v.warnings.length) {
-        result.appendChild(section("Warnings", v.warnings, "warning"));
-      }
-      if (v.importable && !v.warnings.length) {
-        result.appendChild(h("div", { class: "issue", style: "color:var(--green)" }, "Schema looks good."));
+      if (c.parseError) {
+        card.appendChild(h("div", { class: "issue error", style: "margin-top:6px" }, c.parseError));
+        return card;
       }
 
-      const clash = await findDeckByName(v.dto.deck_name);
-      if (clash && v.importable) {
-        const pick = h("div", { class: "card tight" });
-        pick.appendChild(
+      const v = c.validation;
+      card.appendChild(
+        h(
+          "div",
+          { class: "meta", style: "margin-top:6px" },
+          h("span", {}, v.dto.deck_name),
+          h("span", {}, `${v.itemCount} items`),
+          h("span", {}, `${v.questionCount} questions`)
+        )
+      );
+
+      if (v.errors.length > 0) {
+        const box = h(
+          "div",
+          { class: "issue error", style: "margin-top:6px" },
+          `${v.errors.length} error${v.errors.length === 1 ? "" : "s"} — this one won't be imported`
+        );
+        card.appendChild(box);
+        for (const e of v.errors) {
+          card.appendChild(
+            h("div", { class: "small muted", style: "margin-top:2px" }, `${e.path}: ${e.message}`)
+          );
+        }
+      } else if (v.warnings.length > 0) {
+        card.appendChild(
           h(
             "div",
-            { class: "small", style: "color:var(--orange)" },
-            `⚠️ A deck named "${v.dto.deck_name}" already exists.`
+            { class: "issue warning", style: "margin-top:6px" },
+            `${v.warnings.length} warning${v.warnings.length === 1 ? "" : "s"}`
           )
         );
-        for (const [val, label, hint] of [
-          ["copy", "Import as a copy (recommended)", "Keeps both — the new one is renamed automatically."],
-          ["replace", "Replace existing deck", "Deletes its items, questions, review schedule and history."],
+      } else {
+        card.appendChild(
+          h("div", { class: "small", style: "color:var(--green);margin-top:6px" }, "Looks good")
+        );
+      }
+
+      if (c.clashName && v.isImportable) {
+        const pick = h("div", { style: "margin-top:10px" });
+        pick.appendChild(
+          h("div", { class: "small", style: "color:var(--orange)" }, `⚠️ "${c.clashName}" already exists`)
+        );
+        for (const [val, label] of [
+          ["copy", "Import as a copy (recommended)"],
+          ["replace", "Replace existing deck"],
         ]) {
-          const id = `res-${val}`;
           pick.appendChild(
             h(
               "label",
-              { class: "row", style: "gap:8px;margin-top:8px;align-items:flex-start" },
+              { class: "row", style: "gap:6px;margin-top:6px" },
               h("input", {
                 type: "radio",
-                name: "resolution",
-                id,
-                checked: resolution === val,
+                name: `res-${c.id}`,
+                checked: c.resolution === val,
                 onchange: () => {
-                  resolution = val;
+                  c.resolution = val;
                   paint();
                 },
-                style: "width:auto;margin-top:3px",
+                style: "width:auto",
               }),
-              h(
-                "span",
-                {},
-                h("div", {}, label),
-                h("div", { class: "small muted" }, hint)
-              )
+              h("span", { class: "small" }, label)
             )
           );
         }
-        result.appendChild(pick);
+        card.appendChild(pick);
       }
+
+      return card;
     }
 
     body.append(
       promptTemplateSection(),
-      h("label", { class: "field" }, h("span", {}, "Paste JSON"), ta),
+      h("label", { class: "field" }, h("span", {}, "Paste JSON (one deck)"), ta),
+      h("div", { class: "row", style: "margin:8px 0" }, validatePasteBtn),
       fileInput,
-      result
+      h("p", { class: "small muted" }, "Or pick several .json files at once below — each is validated independently and you can drop any of them before importing."),
+      summaryBar,
+      resultsList
     );
 
-    if (prefill.trim()) runValidate();
+    if (prefill.trim()) addCandidate("paste", "Pasted JSON", prefill);
     else paint();
 
     return overlay;
@@ -214,17 +291,4 @@ function promptTemplateSection() {
     ])
   );
   return det;
-}
-
-function row(k, v) {
-  return h("div", { class: "row between small", style: "padding:3px 0" }, h("span", { class: "muted" }, k), h("span", {}, v || "—"));
-}
-function section(title, issues, cls) {
-  const box = h("div", { class: "card tight" }, h("div", { class: "section-title" }, title));
-  for (const it of issues) {
-    box.appendChild(
-      h("div", { class: `issue ${cls}` }, h("div", {}, h("div", {}, it.message), h("div", { class: "path" }, it.path)))
-    );
-  }
-  return box;
 }
