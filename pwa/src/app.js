@@ -7,12 +7,14 @@ import { renderDaily } from "./views/daily.js";
 import { renderStats } from "./views/stats.js";
 import { renderStreak } from "./views/streak.js";
 import { renderDecks } from "./views/decks.js";
+import { renderRoadmaps } from "./views/roadmaps.js";
 
 const TABS = [
   { id: "today", label: "Today", icon: ICONS.today, render: renderDaily },
   { id: "stats", label: "Stats", icon: ICONS.stats, render: renderStats },
   { id: "streak", label: "Streak", icon: ICONS.streak, render: renderStreak },
   { id: "decks", label: "Decks", icon: ICONS.decks, render: renderDecks },
+  { id: "roadmaps", label: "Roadmaps", icon: ICONS.map, render: renderRoadmaps },
 ];
 
 const appRoot = document.getElementById("app");
