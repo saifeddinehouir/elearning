@@ -36,16 +36,29 @@ export function toast(message, ms = 2200) {
 }
 
 const overlayRoot = () => document.getElementById("overlay-root");
+const SHEET_EXIT_MS = 220;
+
+// Lets the sheet slide down before it's removed, instead of vanishing
+// instantly. Safe to call even if another openOverlay() clobbers it mid-close
+// (clear() just removes whatever is there).
+function animatedClose(root) {
+  const el = root.firstElementChild;
+  if (!el) return;
+  el.classList.add("closing");
+  setTimeout(() => {
+    if (root.firstElementChild === el) clear(root);
+  }, SHEET_EXIT_MS);
+}
 
 export function openOverlay(buildFn) {
   const root = overlayRoot();
   clear(root);
-  const close = () => clear(root);
+  const close = () => animatedClose(root);
   root.appendChild(buildFn(close));
   return close;
 }
 
-export const closeOverlay = () => clear(overlayRoot());
+export const closeOverlay = () => animatedClose(overlayRoot());
 
 export const icon = (paths) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;

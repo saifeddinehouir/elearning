@@ -67,6 +67,8 @@ export async function renderDecks() {
     return wrap;
   }
 
+  wrap.appendChild(roadmapSection(decks));
+
   wrap.appendChild(
     h(
       "div",
@@ -86,6 +88,7 @@ export async function renderDecks() {
     )
   );
 
+  wrap.appendChild(h("div", { class: "section-header" }, "All decks"));
   for (const d of decks) {
     const card = h("div", {
       class: "card deck",
@@ -142,6 +145,65 @@ export async function renderDecks() {
     const r = await loadSampleDeck(kind);
     toast(`Loaded ${r.deck.name}`);
   }
+}
+
+// A Duolingo-style vertical path: one node per deck, in the order they were
+// imported, so it reads as "the curriculum you set up" rather than a re-sorted
+// list. The first not-yet-fully-studied deck is the "active" stop.
+function roadmapSection(decks) {
+  const ordered = [...decks].sort((a, b) => a.createdAt - b.createdAt);
+  const activeIdx = ordered.findIndex((d) => d.studiedFraction < 0.999);
+
+  const card = h("div", { class: "card" });
+  card.appendChild(h("div", { class: "section-title" }, "Your path"));
+  const path = h("div", { class: "roadmap" });
+
+  ordered.forEach((d, i) => {
+    const pct = Math.round(d.studiedFraction * 100);
+    const done = pct >= 100;
+    const status = done ? "done" : i === activeIdx ? "active" : "todo";
+    const ringColor = done ? "var(--green)" : "var(--accent)";
+
+    const dot = h(
+      "div",
+      { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` },
+      h("div", { class: "roadmap-dot-inner" }, done ? "✓" : String(pct))
+    );
+
+    path.appendChild(
+      h(
+        "div",
+        {
+          class: "roadmap-node",
+          role: "button",
+          tabindex: "0",
+          onclick: () => openDeckDetail(d.id),
+          onkeydown: (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openDeckDetail(d.id);
+            }
+          },
+        },
+        dot,
+        h(
+          "div",
+          { class: "spacer" },
+          h("div", { class: "roadmap-name" }, d.name),
+          h(
+            "div",
+            { class: "row small muted", style: "gap:8px;margin-top:2px" },
+            h("span", {}, `${d.questionCount} questions`),
+            d.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${d.dueCount} due`) : null
+          )
+        ),
+        h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px" })
+      )
+    );
+  });
+
+  card.appendChild(path);
+  return card;
 }
 
 async function openDeckDetail(deckId) {
