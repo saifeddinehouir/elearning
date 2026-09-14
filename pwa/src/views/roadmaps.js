@@ -1,5 +1,15 @@
-import { h, toast, openOverlay, ICONS } from "../dom.js";
-import { listDecks, listRoadmaps, attachDeckToNode, deleteRoadmap } from "../store.js";
+import { h, clear, toast, openOverlay, ICONS } from "../dom.js";
+import {
+  listDecks,
+  listRoadmaps,
+  attachDeckToNode,
+  deleteRoadmap,
+  renameRoadmap,
+  updateRoadmapNode,
+  addRoadmapNode,
+  removeRoadmapNode,
+  moveRoadmapNode,
+} from "../store.js";
 import { openImport } from "./import.js";
 import { openDeckDetail } from "./decks.js";
 import { empty } from "./daily.js";
@@ -207,11 +217,15 @@ function roadmapsSection(roadmaps, decks) {
   return wrap;
 }
 
-// Full-screen view of one roadmap's path. Re-fetches by id (rather than
-// taking the roadmap/decks objects directly) so it can cleanly reopen itself
-// after an attach — opening the attach picker replaces this overlay (only
-// one is ever on screen at a time), so there's no element left to repaint in
-// place once it closes.
+// Full-screen view of one roadmap's path, with a toggleable edit mode for
+// renaming the roadmap, reordering/renaming/removing nodes, and adding new
+// ones — all without needing to regenerate and re-import the whole roadmap
+// JSON for a small tweak. Re-fetches by id (rather than taking the
+// roadmap/decks objects directly) so it can cleanly reopen itself after an
+// attach — opening the attach picker replaces this overlay (only one is ever
+// on screen at a time), so there's no element left to repaint in place once
+// it closes. Every other mutation here (rename, reorder, add/remove/edit a
+// node) stays inside this same overlay and just repaints in place.
 function openRoadmapDetail(roadmapId) {
   openOverlay((close) => {
     const overlay = h("div", { class: "overlay" });
@@ -219,20 +233,37 @@ function openRoadmapDetail(roadmapId) {
     const body = h("div", { class: "o-body" });
     overlay.append(head, body);
     const titleEl = h("strong", {}, "");
-    head.append(h("button", { class: "btn", onclick: close }, "Back"), titleEl, h("div", { class: "spacer" }));
+    const editBtn = h("button", { class: "btn", onclick: () => { editMode = !editMode; paint(); } }, "Edit");
+    head.append(h("button", { class: "btn", onclick: close }, "Back"), titleEl, h("div", { class: "spacer" }), editBtn);
 
-    (async () => {
-      const [decks, roadmaps] = await Promise.all([listDecks(), listRoadmaps()]);
-      const roadmap = roadmaps.find((r) => r.id === roadmapId);
-      if (!roadmap) {
+    let editMode = false;
+    let roadmap = null;
+    let decks = [];
+
+    async function refresh() {
+      const [freshDecks, roadmaps] = await Promise.all([listDecks(), listRoadmaps()]);
+      const freshRoadmap = roadmaps.find((r) => r.id === roadmapId);
+      if (!freshRoadmap) {
         close();
         return;
       }
-      titleEl.textContent = roadmap.name;
+      roadmap = freshRoadmap;
+      decks = freshDecks;
+      paint();
+    }
 
-      const card = h("div", { class: "card" });
-      card.appendChild(renderPathNodes(decks, roadmap, { onAttached: () => openRoadmapDetail(roadmapId) }));
-      body.appendChild(card);
+    function paint() {
+      titleEl.textContent = roadmap.name;
+      editBtn.textContent = editMode ? "Done" : "Edit";
+      clear(body);
+
+      if (editMode) {
+        body.appendChild(editForm());
+      } else {
+        const card = h("div", { class: "card" });
+        card.appendChild(renderPathNodes(decks, roadmap, { onAttached: refresh }));
+        body.appendChild(card);
+      }
 
       body.appendChild(
         h(
@@ -249,8 +280,105 @@ function openRoadmapDetail(roadmapId) {
           "Delete this roadmap"
         )
       );
-    })();
+    }
 
+    function editForm() {
+      const wrap = h("div", {});
+
+      const nameCard = h("div", { class: "card tight" });
+      nameCard.appendChild(h("label", { class: "field", style: "margin-bottom:0" },
+        h("span", {}, "Roadmap name"),
+        h("input", {
+          type: "text",
+          value: roadmap.name,
+          onchange: async (e) => {
+            const name = e.target.value.trim();
+            if (name && name !== roadmap.name) await renameRoadmap(roadmap.id, name);
+            await refresh();
+          },
+        })
+      ));
+      wrap.appendChild(nameCard);
+
+      wrap.appendChild(h("div", { class: "section-header" }, "Stages"));
+      roadmap.nodes.forEach((node, i) => wrap.appendChild(editableNodeCard(node, i)));
+
+      wrap.appendChild(
+        h(
+          "button",
+          {
+            class: "btn block mt",
+            onclick: async () => {
+              await addRoadmapNode(roadmap.id, "New stage");
+              await refresh();
+            },
+          },
+          "+ Add a stage"
+        )
+      );
+      return wrap;
+    }
+
+    function editableNodeCard(node, index) {
+      const card = h("div", { class: "card tight", style: "margin-bottom:10px" });
+
+      const upBtn = h("button", {
+        class: "btn",
+        style: "padding:6px 8px",
+        disabled: index === 0,
+        "aria-label": "Move up",
+        html: ICONS.up,
+        onclick: async () => { await moveRoadmapNode(roadmap.id, node.id, -1); await refresh(); },
+      });
+      const downBtn = h("button", {
+        class: "btn",
+        style: "padding:6px 8px",
+        disabled: index === roadmap.nodes.length - 1,
+        "aria-label": "Move down",
+        html: ICONS.down,
+        onclick: async () => { await moveRoadmapNode(roadmap.id, node.id, 1); await refresh(); },
+      });
+      const removeBtn = h("button", {
+        class: "btn",
+        style: "padding:6px 8px;color:var(--red)",
+        "aria-label": "Remove stage",
+        html: ICONS.trash,
+        onclick: async () => {
+          if (confirm(`Remove "${node.title}" from this roadmap? Its attached deck (if any) is kept.`)) {
+            await removeRoadmapNode(roadmap.id, node.id);
+            await refresh();
+          }
+        },
+      });
+
+      card.append(
+        h("div", { class: "row", style: "gap:6px" }, upBtn, downBtn, h("div", { class: "spacer" }), removeBtn),
+        h("input", {
+          type: "text",
+          value: node.title,
+          style: "margin-top:10px;font-weight:700",
+          onchange: async (e) => {
+            const title = e.target.value.trim();
+            if (title && title !== node.title) await updateRoadmapNode(roadmap.id, node.id, { title });
+            await refresh();
+          },
+        }),
+        h("input", {
+          type: "text",
+          value: node.description,
+          placeholder: "Description (optional)",
+          style: "margin-top:8px",
+          onchange: async (e) => {
+            const description = e.target.value.trim();
+            if (description !== node.description) await updateRoadmapNode(roadmap.id, node.id, { description });
+            await refresh();
+          },
+        })
+      );
+      return card;
+    }
+
+    refresh();
     return overlay;
   });
 }

@@ -83,4 +83,7 @@ export const ICONS = {
   flag: icon('<path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/>'),
   chevronLeft: icon('<polyline points="15 6 9 12 15 18"/>'),
   map: icon('<polygon points="3 6 9 4 15 6 21 4 21 18 15 20 9 18 3 20 3 6"/><line x1="9" y1="4" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="20"/>'),
+  pencil: icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  up: icon('<polyline points="18 15 12 9 6 15"/>'),
+  down: icon('<polyline points="6 9 12 15 18 9"/>'),
 };

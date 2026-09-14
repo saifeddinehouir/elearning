@@ -414,15 +414,6 @@ export async function importRoadmap(dto) {
 
 export const listRoadmaps = () => dbGetAll(STORES.roadmaps);
 
-// The app only ever surfaces one roadmap at a time (the most recently
-// imported) — multiple are stored so nothing is lost if you import another,
-// but there's no UI yet to switch between them.
-export async function getLatestRoadmap() {
-  const all = await listRoadmaps();
-  if (all.length === 0) return null;
-  return all.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
-}
-
 export async function attachDeckToNode(roadmapId, nodeId, deckId) {
   const roadmap = await dbGet(STORES.roadmaps, roadmapId);
   if (!roadmap) return;
@@ -435,6 +426,52 @@ export async function attachDeckToNode(roadmapId, nodeId, deckId) {
 
 export async function deleteRoadmap(roadmapId) {
   await dbDelete(STORES.roadmaps, roadmapId);
+  emit();
+}
+
+export async function renameRoadmap(roadmapId, name) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  roadmap.name = name;
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+}
+
+export async function updateRoadmapNode(roadmapId, nodeId, patch) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  const node = roadmap.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+  Object.assign(node, patch);
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+}
+
+export async function addRoadmapNode(roadmapId, title) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  roadmap.nodes.push({ id: uuid(), title, description: "", deckId: null });
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+}
+
+export async function removeRoadmapNode(roadmapId, nodeId) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  roadmap.nodes = roadmap.nodes.filter((n) => n.id !== nodeId);
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+}
+
+// direction: -1 (move earlier) or 1 (move later)
+export async function moveRoadmapNode(roadmapId, nodeId, direction) {
+  const roadmap = await dbGet(STORES.roadmaps, roadmapId);
+  if (!roadmap) return;
+  const idx = roadmap.nodes.findIndex((n) => n.id === nodeId);
+  const target = idx + direction;
+  if (idx === -1 || target < 0 || target >= roadmap.nodes.length) return;
+  [roadmap.nodes[idx], roadmap.nodes[target]] = [roadmap.nodes[target], roadmap.nodes[idx]];
+  await dbPut(STORES.roadmaps, roadmap);
   emit();
 }
 
