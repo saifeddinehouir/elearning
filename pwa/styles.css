@@ -136,7 +136,7 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .screen-title {
   font-size: clamp(2.3rem, 9vw, 3rem);
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 0.95;
   margin: 6px 0 22px;
@@ -146,7 +146,7 @@ h1, h2, h3 { text-wrap: balance; }
 .screen-head { align-items: flex-end; padding-bottom: 14px; margin-bottom: 0; border-bottom: 2px solid var(--ink); }
 .screen-head .screen-title { margin: 6px 0 0; }
 .screen-head + .card, .screen-head + .empty { border-top: 0; padding-top: 18px; }
-.section-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+.section-title { font-size: 1.05rem; font-weight: 680; letter-spacing: -0.02em; margin-bottom: 10px; }
 .section-header {
   font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--ink-3); margin: 26px 0 0; padding-bottom: 6px;
@@ -202,7 +202,7 @@ h1, h2, h3 { text-wrap: balance; }
 .card + .card, .card + .tiles, .tiles + .card { margin-top: 2px; }
 .card[role="button"], .card.option, button.card { cursor: pointer; width: 100%; text-align: left; display: block; }
 .card.option { display: flex; }
-.promo-title { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.028em; line-height: 1.02; margin-top: 6px; }
+.promo-title { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.028em; line-height: 1.02; margin-top: 6px; }
 .promo-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
   display: inline-block; font-size: 0.72rem; font-weight: 700;
@@ -395,7 +395,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .roadmap-node:active { background: var(--fill); }
 .roadmap-node .chevron { margin-top: 12px; }
 .roadmap-text { min-width: 0; padding-top: 1px; }
-.roadmap-name { font-weight: 800; letter-spacing: -0.02em; font-size: 1.02rem; }
+.roadmap-name { font-weight: 650; letter-spacing: -0.02em; font-size: 1.02rem; }
 .roadmap-sub { margin-top: 1px; line-height: 1.4; }
 .roadmap-attach { color: var(--accent); margin-top: 3px; font-weight: 700; }
 .roadmap-dot {
@@ -469,14 +469,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .q-card.q-enter + .choices { animation: q-in 0.3s var(--ease); }
 @keyframes q-in { from { opacity: 0; transform: translateX(12px); } }
 .q-problem { margin: 16px 0 2px; padding: 12px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
-.q-problem-title { display: flex; align-items: center; gap: 7px; font-weight: 800; letter-spacing: -0.02em; font-size: 1rem; }
+.q-problem-title { display: flex; align-items: center; gap: 7px; font-weight: 650; letter-spacing: -0.02em; font-size: 1rem; }
 .q-problem-title > span:first-child { display: inline-flex; color: var(--ink-3); }
 .q-problem-title svg { width: 15px; height: 15px; display: block; }
 .q-problem-body { color: var(--ink-2); margin-top: 6px; font-size: 0.92rem; line-height: 1.55; white-space: pre-wrap; }
 .q-context { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); padding: 11px 0; margin: 14px 0; font-size: 0.9rem; }
 .q-context summary { cursor: pointer; font-weight: 800; }
 .q-context .body { color: var(--ink-2); margin-top: 8px; white-space: pre-wrap; line-height: 1.55; }
-.q-prompt { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.022em; line-height: 1.18; margin: 18px 0 16px; }
+.q-prompt { font-size: 1.4rem; font-weight: 650; letter-spacing: -0.022em; line-height: 1.18; margin: 18px 0 16px; }
 
 .choices { border-bottom: 1px solid var(--hair); }
 .choice {
@@ -515,7 +515,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .feedback.correct { border-top-color: var(--accent); }
 .feedback.wrong { border-top-color: var(--bad); }
 @keyframes fade-up { from { opacity: 0; transform: translateY(6px); } }
-.feedback .fb-title { font-weight: 900; font-size: 1.15rem; letter-spacing: -0.03em; margin-bottom: 4px; }
+.feedback .fb-title { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.03em; margin-bottom: 4px; }
 .feedback.correct .fb-title { color: var(--accent); }
 .feedback.wrong .fb-title { color: var(--bad); }
 .fb-answer { font-weight: 700; font-size: 0.92rem; }
@@ -532,7 +532,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* ---------- Session summary ---------- */
 .summary { padding: 10px 0 4px; display: flex; flex-direction: column; align-items: stretch; }
 .summary .ring { margin-bottom: 4px; }
-.summary-title { font-size: 1.9rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin: 22px 0 6px; }
+.summary-title { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin: 22px 0 6px; }
 .summary .tiles { width: 100%; margin-top: 20px !important; }
 .card.misses { margin-top: 18px; }
 .card.misses summary { cursor: pointer; font-weight: 800; list-style: none; display: flex; justify-content: space-between; }
@@ -571,7 +571,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 /* ---------- Deck list ---------- */
 .deck { display: block; width: 100%; text-align: left; }
-.deck h3 { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.018em; line-height: 1.15; }
+.deck h3 { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.018em; line-height: 1.15; }
 .meta { display: flex; gap: 4px 12px; flex-wrap: wrap; color: var(--ink-2); font-size: 0.78rem; font-weight: 600; margin: 6px 0 12px; font-variant-numeric: tabular-nums; }
 
 /* ---------- Today ---------- */
@@ -581,11 +581,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .welcome p { text-align: left !important; }
 .card.option { align-items: center; gap: 14px; padding: 16px 0; border-top-width: 1px; border-top-color: var(--ink); }
 .card.option + .card.option { margin-top: 0; }
-.option-title { display: block; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
+.option-title { display: block; font-weight: 650; font-size: 1.05rem; letter-spacing: -0.02em; }
 .option-sub { display: block; font-size: 0.84rem; color: var(--ink-2); margin-top: 2px; line-height: 1.4; font-weight: 500; }
 
 /* Daily challenge */
-.challenge-name { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.028em; line-height: 1; margin-top: 6px; }
+.challenge-name { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.028em; line-height: 1; margin-top: 6px; }
 .challenge-streak { flex: none; font-weight: 900; font-size: 0.8rem; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .challenge-result { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hair); }
 .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 16px; }
@@ -625,7 +625,7 @@ pre.code {
 .card.cheat.hard { border-top: 1px solid var(--hair); }
 .cheat-num { flex: none; font-weight: 900; font-size: 1.3rem; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; width: 34px; color: var(--ink-3); }
 .card.cheat.hard .cheat-num { color: var(--bad); }
-.cheat-name { display: block; font-weight: 800; letter-spacing: -0.02em; }
+.cheat-name { display: block; font-weight: 650; letter-spacing: -0.02em; }
 .cheat-tag { display: block; font-size: 0.8rem; color: var(--ink-2); margin-top: 1px; font-weight: 500; }
 
 /* ---------- Stats: mastery grid ---------- */
@@ -654,7 +654,7 @@ pre.code {
 /* ---------- Misc ---------- */
 .empty { text-align: left; padding: 22px 0 28px; border-top: 2px solid var(--ink); }
 .empty .icon { display: none; }
-.empty .section-title { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.028em; line-height: 1.05; margin-bottom: 8px; }
+.empty .section-title { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.028em; line-height: 1.05; margin-bottom: 8px; }
 .empty p { color: var(--ink-2); max-width: 42ch; }
 .disclosure { border-top: 1px solid var(--hair); padding: 11px 0; }
 .disclosure summary { cursor: pointer; font-weight: 700; display: flex; gap: 8px; align-items: center; }
