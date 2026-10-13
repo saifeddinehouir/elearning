@@ -2,6 +2,7 @@ import { h, clear, toast, openOverlay, ICONS } from "../dom.js";
 import {
   listDecks,
   listRoadmaps,
+  installPatternPath,
   attachDeckToNode,
   deleteRoadmap,
   renameRoadmap,
@@ -14,6 +15,48 @@ import { openImport } from "./import.js";
 import { openDeckDetail } from "./decks.js";
 import { empty } from "./daily.js";
 import { ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
+import { PATTERNS, PATTERN_PATH } from "../patterns.js";
+import { openCheatSheet } from "./guide.js";
+
+const isDone = (deck) => !!deck && deck.studiedFraction >= 0.999;
+
+// Installs (or repairs) the built-in LeetCode Patterns path and opens it.
+export async function installAndOpenPath() {
+  const roadmap = await installPatternPath();
+  toast("LeetCode Patterns path ready — stage 1 is in your daily mix");
+  openRoadmapDetail(roadmap.id);
+}
+
+// Promo shown until the built-in path is installed.
+export function pathPromoCard() {
+  const questions = PATTERNS.reduce((n, p) => n + p.problems.length * 2, 0);
+  return h(
+    "div",
+    { class: "card promo" },
+    h("div", { class: "kicker" }, "Built-in path"),
+    h("div", { class: "promo-title" }, PATTERN_PATH.name),
+    h("p", { class: "small muted", style: "margin:4px 0 12px" }, PATTERN_PATH.blurb),
+    h(
+      "div",
+      { class: "promo-chips" },
+      ...PATTERNS.slice(0, 6).map((p) => h("span", { class: "chip" }, p.name)),
+      h("span", { class: "chip faint" }, `+${PATTERNS.length - 6} more`)
+    ),
+    h(
+      "div",
+      { class: "meta", style: "margin:12px 0" },
+      h("span", {}, `${PATTERNS.length} stages`),
+      h("span", {}, `${questions} questions`),
+      h("span", {}, "unlocks as you go")
+    ),
+    h(
+      "div",
+      { class: "row", style: "gap:10px" },
+      h("button", { class: "btn primary block", onclick: installAndOpenPath }, "Start the path"),
+      h("button", { class: "btn", onclick: openCheatSheet }, "Cheat sheet")
+    )
+  );
+}
 
 export async function renderRoadmaps() {
   const [decks, roadmaps] = await Promise.all([listDecks(), listRoadmaps()]);
@@ -27,37 +70,30 @@ export async function renderRoadmaps() {
     )
   );
 
-  wrap.appendChild(
-    h(
-      "div",
-      { class: "row", style: "justify-content:center;margin-bottom:14px" },
-      h(
-        "button",
-        {
-          class: "btn block",
-          onclick: async () => {
-            const ok = await copyText(ROADMAP_PROMPT_TEMPLATE);
-            toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
-          },
-        },
-        "🗺️ Copy the roadmap prompt"
-      )
-    )
-  );
+  if (!roadmaps.some((r) => r.builtin === PATTERN_PATH.key)) wrap.appendChild(pathPromoCard());
 
   if (roadmaps.length === 0 && decks.length === 0) {
     wrap.appendChild(
-      empty(
-        "🗺️",
-        "No roadmaps yet",
-        "Copy the prompt above, plan a curriculum with ChatGPT or Claude, and import the result — or import a deck first and a simple path builds itself.",
-        { label: "Import", onclick: () => openImport() }
-      )
+      empty("🗺️", "Or plan your own", "Copy the roadmap prompt below, plan a curriculum with ChatGPT or Claude, and import the result.")
     );
-    return wrap;
+  } else {
+    wrap.appendChild(roadmaps.length > 0 ? roadmapsSection(roadmaps, decks) : fallbackPathCard(decks));
   }
 
-  wrap.appendChild(roadmaps.length > 0 ? roadmapsSection(roadmaps, decks) : fallbackPathCard(decks));
+  wrap.appendChild(
+    h(
+      "button",
+      {
+        class: "btn block subtle mt",
+        onclick: async () => {
+          const ok = await copyText(ROADMAP_PROMPT_TEMPLATE);
+          toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
+        },
+      },
+      h("span", { html: ICONS.sparkle }),
+      "Copy the roadmap prompt for your own path"
+    )
+  );
   return wrap;
 }
 
@@ -75,12 +111,20 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
         .sort((a, b) => a.createdAt - b.createdAt)
         .map((d) => ({ title: d.name, subtitle: null, node: null, deck: d }));
 
-  const activeIdx = entries.findIndex((e) => !(e.deck && e.deck.studiedFraction >= 0.999));
+  const activeIdx = entries.findIndex((e) => !isDone(e.deck));
   const path = h("div", { class: "roadmap" });
-  entries.forEach((entry, i) => path.appendChild(pathNode(entry, i === activeIdx)));
+  entries.forEach((entry, i) => {
+    // Built-in paths unlock in order. Locked stages stay tappable so you can
+    // study ahead; they just aren't in the daily mix yet.
+    const locked = !!(roadmap?.builtin && entry.node && !entry.node.unlocked);
+    const el = pathNode(entry, i === activeIdx, locked);
+    if (isDone(entry.deck)) el.classList.add("is-done");
+    if (locked) el.classList.add("locked");
+    path.appendChild(el);
+  });
   return path;
 
-  function pathNode(entry, isActive) {
+  function pathNode(entry, isActive, locked) {
     const { deck, node } = entry;
 
     if (!deck) {
@@ -101,18 +145,24 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
         h("div", { class: `roadmap-dot unattached${isActive ? " active" : ""}` }, h("div", { class: "roadmap-dot-inner" }, "+")),
         h(
           "div",
-          { class: "spacer" },
+          { class: "spacer roadmap-text" },
           h("div", { class: "roadmap-name" }, entry.title),
-          h("div", { class: "small muted", style: "margin-top:2px" }, entry.subtitle || "Tap to attach a deck")
+          h("div", { class: "small muted roadmap-sub" }, entry.subtitle || "Tap to attach a deck"),
+          entry.subtitle ? h("div", { class: "small roadmap-attach" }, "Tap to attach a deck") : null
         ),
-        h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px" })
+        h("span", { class: "chevron", html: ICONS.chevron })
       );
     }
 
     const pct = Math.round(deck.studiedFraction * 100);
-    const done = pct >= 100;
+    const done = isDone(deck);
     const status = done ? "done" : isActive ? "active" : "todo";
     const ringColor = done ? "var(--green)" : "var(--accent)";
+    const inner = done
+      ? h("div", { class: "roadmap-dot-inner" }, "✓")
+      : locked
+      ? h("div", { class: "roadmap-dot-inner", html: ICONS.lock })
+      : h("div", { class: "roadmap-dot-inner" }, pct > 0 ? `${pct}%` : "Go");
 
     return h(
       "div",
@@ -128,23 +178,21 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
           }
         },
       },
+      h("div", { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` }, inner),
       h(
         "div",
-        { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` },
-        h("div", { class: "roadmap-dot-inner" }, done ? "✓" : String(pct))
-      ),
-      h(
-        "div",
-        { class: "spacer" },
+        { class: "spacer roadmap-text" },
         h("div", { class: "roadmap-name" }, entry.title),
+        entry.subtitle ? h("div", { class: "small muted roadmap-sub" }, entry.subtitle) : null,
         h(
           "div",
-          { class: "row small muted", style: "gap:8px;margin-top:2px" },
+          { class: "row small muted", style: "gap:8px;margin-top:4px;flex-wrap:wrap" },
           h("span", {}, `${deck.questionCount} questions`),
-          deck.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${deck.dueCount} due`) : null
+          deck.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${deck.dueCount} due`) : null,
+          locked ? h("span", { class: "badge" }, "Locked") : isActive && !done ? h("span", { class: "badge accent" }, "Up next") : null
         )
       ),
-      h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px" })
+      h("span", { class: "chevron", html: ICONS.chevron })
     );
   }
 }
@@ -154,13 +202,13 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
 // "Roadmaps" section below instead.
 function fallbackPathCard(decks) {
   const card = h("div", { class: "card" });
-  card.appendChild(h("div", { class: "section-title" }, "Your path"));
+  card.appendChild(h("div", { class: "section-title" }, "Your decks as a path"));
   card.appendChild(renderPathNodes(decks, null));
   card.appendChild(
     h(
       "p",
       { class: "small muted", style: "margin-top:10px" },
-      "This order is just your import history. Copy the roadmap prompt above for a named, structured path instead."
+      "This order is just your import history. Copy the roadmap prompt below for a named, structured path instead."
     )
   );
   return card;
@@ -171,18 +219,18 @@ function fallbackPathCard(decks) {
 function roadmapsSection(roadmaps, decks) {
   const deckById = new Map(decks.map((d) => [d.id, d]));
   const wrap = h("div", {});
-  wrap.appendChild(h("div", { class: "section-header" }, "All roadmaps"));
+  wrap.appendChild(h("div", { class: "section-header" }, "Your paths"));
 
-  for (const rm of roadmaps) {
+  // Built-in path first, then newest.
+  const ordered = [...roadmaps].sort((a, b) => (b.builtin ? 1 : 0) - (a.builtin ? 1 : 0) || b.createdAt - a.createdAt);
+  for (const rm of ordered) {
     const total = rm.nodes.length;
-    const done = rm.nodes.filter((n) => {
-      const d = n.deckId ? deckById.get(n.deckId) : null;
-      return d && d.studiedFraction >= 0.999;
-    }).length;
+    const done = rm.nodes.filter((n) => isDone(n.deckId ? deckById.get(n.deckId) : null)).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
+    const next = rm.nodes.find((n) => !isDone(n.deckId ? deckById.get(n.deckId) : null));
 
     const card = h("div", {
-      class: "card deck",
+      class: `card deck${rm.builtin ? " builtin-path" : ""}`,
       role: "button",
       tabindex: "0",
       onclick: () => openRoadmapDetail(rm.id),
@@ -197,14 +245,19 @@ function roadmapsSection(roadmaps, decks) {
       h(
         "div",
         { class: "row", style: "align-items:flex-start" },
-        h("span", { class: "icon-chip c-teal", html: ICONS.map }),
+        h("span", { class: `icon-chip ${rm.builtin ? "c-purple" : "c-teal"}`, html: rm.builtin ? ICONS.code : ICONS.map }),
         h(
           "div",
           { class: "spacer" },
           h("h3", {}, rm.name),
-          h("div", { class: "meta" }, h("span", {}, `${total} stage${total === 1 ? "" : "s"}`), h("span", {}, `${done}/${total} complete`))
+          h(
+            "div",
+            { class: "meta" },
+            h("span", {}, `${done}/${total} stage${total === 1 ? "" : "s"}`),
+            next ? h("span", { style: "color:var(--accent);font-weight:600" }, `Next: ${next.title}`) : h("span", {}, "🎉 Finished")
+          )
         ),
-        h("span", { class: "chevron", html: ICONS.chevron, style: "width:16px;height:16px;margin-top:6px" })
+        h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
       )
     );
     const prog = h("div", { class: "progress" }, h("i", {}));
@@ -220,19 +273,18 @@ function roadmapsSection(roadmaps, decks) {
 // Full-screen view of one roadmap's path, with a toggleable edit mode for
 // renaming the roadmap, reordering/renaming/removing nodes, and adding new
 // ones — all without needing to regenerate and re-import the whole roadmap
-// JSON for a small tweak. Re-fetches by id (rather than taking the
-// roadmap/decks objects directly) so it can cleanly reopen itself after an
-// attach — opening the attach picker replaces this overlay (only one is ever
-// on screen at a time), so there's no element left to repaint in place once
-// it closes. Every other mutation here (rename, reorder, add/remove/edit a
-// node) stays inside this same overlay and just repaints in place.
-function openRoadmapDetail(roadmapId) {
+// JSON for a small tweak. Takes an id (rather than the roadmap/decks objects)
+// so it can reopen itself after an attach — the attach picker replaces this
+// overlay (only one is ever on screen at a time), so there's nothing left to
+// repaint in place once it closes. Every other mutation here (rename, reorder,
+// add/remove/edit a node) stays inside this same overlay and repaints in place.
+export function openRoadmapDetail(roadmapId) {
   openOverlay((close) => {
     const overlay = h("div", { class: "overlay" });
     const head = h("div", { class: "o-head" });
     const body = h("div", { class: "o-body" });
     overlay.append(head, body);
-    const titleEl = h("strong", {}, "");
+    const titleEl = h("strong", { class: "o-title-text" }, "");
     const editBtn = h("button", { class: "btn", onclick: () => { editMode = !editMode; paint(); } }, "Edit");
     head.append(h("button", { class: "btn", onclick: close }, "Back"), titleEl, h("div", { class: "spacer" }), editBtn);
 
@@ -260,8 +312,10 @@ function openRoadmapDetail(roadmapId) {
       if (editMode) {
         body.appendChild(editForm());
       } else {
+        body.appendChild(detailHeader());
         const card = h("div", { class: "card" });
-        card.appendChild(renderPathNodes(decks, roadmap, { onAttached: refresh }));
+        // The picker replaced this overlay, so reopen rather than repaint a detached node.
+        card.appendChild(renderPathNodes(decks, roadmap, { onAttached: () => openRoadmapDetail(roadmapId) }));
         body.appendChild(card);
       }
 
@@ -279,6 +333,38 @@ function openRoadmapDetail(roadmapId) {
           },
           "Delete this roadmap"
         )
+      );
+    }
+
+    function detailHeader() {
+      const deckById = new Map(decks.map((d) => [d.id, d]));
+      const total = roadmap.nodes.length;
+      const done = roadmap.nodes.filter((n) => isDone(n.deckId ? deckById.get(n.deckId) : null)).length;
+      const questions = roadmap.nodes.reduce((s, n) => s + (deckById.get(n.deckId)?.questionCount || 0), 0);
+      const prog = h("div", { class: "progress", style: "margin-top:12px" }, h("i", {}));
+      prog.firstChild.style.width = `${total ? (done / total) * 100 : 0}%`;
+      return h(
+        "div",
+        { class: `card${roadmap.builtin ? " builtin-path" : ""}` },
+        h("div", { class: "kicker" }, roadmap.builtin ? "Built-in path" : "Your roadmap"),
+        h("div", { class: "promo-title" }, roadmap.name),
+        h(
+          "div",
+          { class: "meta", style: "margin:6px 0 0" },
+          h("span", {}, `${done}/${total} stages complete`),
+          h("span", {}, `${questions} questions`)
+        ),
+        prog,
+        roadmap.builtin
+          ? h(
+              "p",
+              { class: "small muted", style: "margin-top:10px" },
+              "A stage joins your daily mix once you've seen every question in the stage before it. You can still study locked stages on their own."
+            )
+          : null,
+        roadmap.builtin
+          ? h("button", { class: "btn block mt", onclick: openCheatSheet }, h("span", { html: ICONS.list }), "Pattern cheat sheet")
+          : null
       );
     }
 
@@ -323,24 +409,22 @@ function openRoadmapDetail(roadmapId) {
       const card = h("div", { class: "card tight", style: "margin-bottom:10px" });
 
       const upBtn = h("button", {
-        class: "btn",
-        style: "padding:6px 8px",
+        class: "btn icon-btn",
         disabled: index === 0,
         "aria-label": "Move up",
         html: ICONS.up,
         onclick: async () => { await moveRoadmapNode(roadmap.id, node.id, -1); await refresh(); },
       });
       const downBtn = h("button", {
-        class: "btn",
-        style: "padding:6px 8px",
+        class: "btn icon-btn",
         disabled: index === roadmap.nodes.length - 1,
         "aria-label": "Move down",
         html: ICONS.down,
         onclick: async () => { await moveRoadmapNode(roadmap.id, node.id, 1); await refresh(); },
       });
       const removeBtn = h("button", {
-        class: "btn",
-        style: "padding:6px 8px;color:var(--red)",
+        class: "btn icon-btn",
+        style: "color:var(--red)",
         "aria-label": "Remove stage",
         html: ICONS.trash,
         onclick: async () => {
@@ -352,7 +436,7 @@ function openRoadmapDetail(roadmapId) {
       });
 
       card.append(
-        h("div", { class: "row", style: "gap:6px" }, upBtn, downBtn, h("div", { class: "spacer" }), removeBtn),
+        h("div", { class: "row", style: "gap:6px" }, h("span", { class: "cheat-num" }, String(index + 1).padStart(2, "0")), upBtn, downBtn, h("div", { class: "spacer" }), removeBtn),
         h("input", {
           type: "text",
           value: node.title,
@@ -407,7 +491,7 @@ function openAttachDeckPicker(roadmap, node, decks, onAttached) {
         )
       );
     } else {
-      const list = h("div", { class: "card tight" });
+      const list = h("div", { class: "list" });
       for (const d of decks) {
         list.appendChild(
           h(

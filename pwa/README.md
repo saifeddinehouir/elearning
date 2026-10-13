@@ -55,7 +55,10 @@ pwa/
     session.js          daily-queue builder (pure)       │ covered by tests/
     streak.js           streak math (pure)               │
     stats.js            attempt aggregations (pure)       │
-    schema.js           JSON schema parse + validate     ─┘
+    schema.js           JSON schema parse + validate      │
+    random.js           seeded RNG, stable UUIDs          │
+    patterns.js         built-in LeetCode pattern path    │
+    challenge.js        daily challenge picker + streak  ─┘
     db.js               IndexedDB promise wrapper
     store.js            data layer: assembles logic inputs, does all mutations
     notifications.js    permission + reminder nudge + SW registration
@@ -63,6 +66,7 @@ pwa/
     dom.js              hyperscript (h), overlay + toast helpers
     views/
       daily.js  session.js  stats.js  streak.js  decks.js  import.js  settings.js
+      roadmaps.js  browse.js  challenge.js  guide.js
   samples/course.json  samples/leetcode.json
   tools/
     serve.mjs           zero-dep dev server
@@ -101,6 +105,39 @@ pwa/
 `id` may be omitted (generated); `topic` / `context` / `explanation` may be empty
 (warning); `choices` must have 2–6 entries; `correct_index` must be in range.
 See [`../PROMPT_TEMPLATE.md`](../PROMPT_TEMPLATE.md) for the generator prompt.
+
+## LeetCode Patterns path (built in, PWA only)
+
+**Today → Start the LeetCode Patterns path** (or the Roadmaps tab) installs 20
+algorithm patterns as one roadmap, one deck per pattern, 120 questions in all —
+no JSON generation needed. Content lives in [`src/patterns.js`](src/patterns.js).
+
+- Every problem asks two things: **"which pattern cracks this?"** (the right
+  pattern vs. three look-alikes) and an insight question (complexity, the key
+  step, or a trace). Missing a recognition question shows that pattern's
+  "spot it when…" signals.
+- Each pattern deck has a **guide**: signals, core idea, a code template and
+  typical complexity. **Pattern cheat sheet** shows all 20, filterable by a clue
+  ("contiguous", "sorted", …).
+- Stages **unlock in order**: a stage joins the daily mix once every question in
+  the stage before it has been seen. Locked stages can still be studied on their
+  own from the path.
+- Ids and answer positions are deterministic, so reinstalling (after deleting a
+  deck) never duplicates anything.
+
+## Daily challenge
+
+A themed mini-set on the Today screen, a different one each weekday:
+
+| Mon | Tue | Wed | Thu | Fri | Sat | Sun |
+|---|---|---|---|---|---|---|
+| 🧩 Pattern Sprint | ⏱️ Big-O Blitz | 🎯 Weak Spot | 🔍 Trace & Fill | ⚡ Speed Round (20 s/question) | 🏔️ Hard Mode | 🛡️ Review Gauntlet |
+
+It draws from all decks, and the question set is frozen for the day the first
+time you see it. If there aren't enough themed questions it tops up with a mixed
+set and says so. Challenges have their own streak and week strip. The first run
+counts like normal study (SM-2 + daily streak); **Replay** is practice only and
+doesn't touch your review schedule. Logic: [`src/challenge.js`](src/challenge.js).
 
 ## Behaviour (matches the native version)
 

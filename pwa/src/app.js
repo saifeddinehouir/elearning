@@ -1,4 +1,4 @@
-import { h, clear, ICONS } from "./dom.js";
+import { h, clear, closeOverlay, ICONS } from "./dom.js";
 import { onChange, getSettings } from "./store.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
@@ -97,6 +97,9 @@ function tabbar() {
 }
 
 window.addEventListener("hashchange", () => {
+  // A sheet left open would otherwise sit on top of the new tab (e.g. after the
+  // browser back gesture), since overlays live outside #app.
+  closeOverlay();
   const next = tabFromHash();
   if (next !== current) {
     current = next;

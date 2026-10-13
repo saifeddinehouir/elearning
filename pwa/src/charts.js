@@ -141,6 +141,46 @@ function level(rec, maxAnswered) {
   return 4;
 }
 
+// A progress ring with a centred label. fraction: 0..1. The arc animates in
+// from empty on first paint.
+export function ring(fraction, { size = 120, stroke = 12, color = "var(--accent)", label = "", sub = "" } = {}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const f = Math.max(0, Math.min(1, fraction || 0));
+  const svg = el("svg", { viewBox: `0 0 ${size} ${size}`, width: size, height: size, "aria-hidden": "true" });
+  svg.appendChild(el("circle", { cx: size / 2, cy: size / 2, r, fill: "none", stroke: "var(--surface-3)", "stroke-width": stroke }));
+  const arc = el("circle", {
+    cx: size / 2,
+    cy: size / 2,
+    r,
+    fill: "none",
+    stroke: color,
+    "stroke-width": stroke,
+    "stroke-linecap": "round",
+    "stroke-dasharray": c.toFixed(2),
+    "stroke-dashoffset": c.toFixed(2),
+    transform: `rotate(-90 ${size / 2} ${size / 2})`,
+    class: "ring-arc",
+  });
+  svg.appendChild(arc);
+  requestAnimationFrame(() => requestAnimationFrame(() => arc.setAttribute("stroke-dashoffset", (c * (1 - f)).toFixed(2))));
+
+  const div = document.createElement("div");
+  div.className = "ring";
+  div.style.width = `${size}px`;
+  div.style.height = `${size}px`;
+  div.setAttribute("role", "img");
+  div.setAttribute("aria-label", `${label} ${sub}`.trim());
+  div.appendChild(svg);
+  const center = document.createElement("div");
+  center.className = "ring-center";
+  center.innerHTML = `<div class="ring-label"></div><div class="ring-sub"></div>`;
+  center.firstChild.textContent = label;
+  center.lastChild.textContent = sub;
+  div.appendChild(center);
+  return div;
+}
+
 function wrap(svg) {
   const div = document.createElement("div");
   div.className = "chart";

@@ -1,7 +1,7 @@
 // Thin promise wrapper around IndexedDB. Browser-only.
 
 const DB_NAME = "dailyqcm";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const STORES = {
   decks: "decks",
@@ -12,6 +12,7 @@ export const STORES = {
   studyDays: "studyDays",
   flags: "flags",
   roadmaps: "roadmaps",
+  challenges: "challenges",
 };
 
 let dbPromise = null;
@@ -57,6 +58,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains(STORES.roadmaps)) {
         db.createObjectStore(STORES.roadmaps, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(STORES.challenges)) {
+        db.createObjectStore(STORES.challenges, { keyPath: "dayStart" });
       }
       void e;
     };

@@ -9,7 +9,10 @@ import {
   loadSampleDeck,
   exportDeckJSON,
   countFlags,
+  getPatternPath,
 } from "../store.js";
+import { guideBlock } from "./guide.js";
+import { installAndOpenPath, openRoadmapDetail } from "./roadmaps.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
@@ -60,6 +63,7 @@ export async function renderDecks() {
       h(
         "div",
         { class: "row", style: "gap:10px;justify-content:center;flex-wrap:wrap" },
+        h("button", { class: "btn", onclick: installAndOpenPath }, "Start LeetCode Patterns path"),
         h("button", { class: "btn", onclick: () => sample("course") }, "Load course sample"),
         h("button", { class: "btn", onclick: () => sample("leetcode") }, "Load LeetCode sample")
       )
@@ -86,8 +90,53 @@ export async function renderDecks() {
     )
   );
 
-  wrap.appendChild(h("div", { class: "section-header" }, "All decks"));
-  for (const d of decks) {
+  // The 20 built-in pattern decks collapse into one card so they don't bury
+  // your own decks; each is still reachable from the path.
+  const builtin = decks.filter((d) => d.builtinKey);
+  const own = decks.filter((d) => !d.builtinKey);
+  if (builtin.length > 0) {
+    const path = await getPatternPath();
+    const seen = builtin.reduce((s, d) => s + d.studiedFraction * d.questionCount, 0);
+    const total = builtin.reduce((s, d) => s + d.questionCount, 0);
+    const due = builtin.reduce((s, d) => s + d.dueCount, 0);
+    const prog = h("div", { class: "progress" }, h("i", {}));
+    prog.firstChild.style.width = `${total ? (seen / total) * 100 : 0}%`;
+    wrap.appendChild(h("div", { class: "section-header" }, "Built-in"));
+    wrap.appendChild(
+      h(
+        "div",
+        {
+          class: "card deck builtin-path",
+          role: "button",
+          tabindex: "0",
+          onclick: () => (path ? openRoadmapDetail(path.id) : installAndOpenPath()),
+        },
+        h(
+          "div",
+          { class: "row", style: "align-items:flex-start" },
+          h("span", { class: "icon-chip c-purple", html: ICONS.code }),
+          h(
+            "div",
+            { class: "spacer" },
+            h("h3", {}, "LeetCode Patterns"),
+            h(
+              "div",
+              { class: "meta" },
+              h("span", {}, `${builtin.length} pattern decks`),
+              h("span", {}, `${total} questions`),
+              due > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${due} due`) : null
+            )
+          ),
+          h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
+        ),
+        prog,
+        h("div", { class: "small muted", style: "margin-top:6px" }, `${Math.round(total ? (seen / total) * 100 : 0)}% seen`)
+      )
+    );
+  }
+
+  if (own.length > 0) wrap.appendChild(h("div", { class: "section-header" }, "Your decks"));
+  for (const d of own) {
     const card = h("div", {
       class: "card deck",
       role: "button",
@@ -159,11 +208,17 @@ export async function openDeckDetail(deckId) {
 
     head.append(
       h("button", { class: "btn", onclick: close }, "Back"),
-      h("strong", {}, deck.name),
+      h("strong", { class: "o-title-text" }, deck.name),
       h("div", { class: "spacer" })
     );
 
     const totalQ = items.reduce((s, i) => s + i.questions.length, 0);
+
+    if (deck.guide) {
+      body.appendChild(
+        h("div", { class: "card guide-card" }, h("div", { class: "section-title" }, "Pattern guide"), guideBlock(deck.guide))
+      );
+    }
 
     body.appendChild(
       h(

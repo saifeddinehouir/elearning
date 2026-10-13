@@ -13,6 +13,7 @@ import {
 } from "./db.js";
 import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./sm2.js";
 import { uuid, UUID_RE, startOfDay } from "./format.js";
+import { PATTERNS, PATTERN_PATH, buildPatternDeck } from "./patterns.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -123,6 +124,7 @@ export async function exportDeckJSON(deckId) {
   const dto = {
     deck_name: deck.name,
     source_type: deck.sourceType,
+    ...(deck.guide ? { guide: deck.guide } : {}),
     items: items.map((it) => ({
       id: it.id,
       title: it.title,
@@ -174,6 +176,8 @@ async function buildPool(filterFn) {
         id: q.id,
         deckId: q.deckId,
         deckName: deck ? deck.name : "Unknown",
+        sourceType: deck ? deck.sourceType : "course",
+        deckGuide: deck ? deck.guide || null : null,
         itemId: q.itemId,
         itemTitle: item.title || "",
         context: item.context || "",
@@ -226,8 +230,10 @@ export async function recordAnswer(question, chosenIndex, now = Date.now()) {
   };
 }
 
+// Returns { unlocked: [stage titles] } — path stages that opened up because
+// this session finished the stage before them.
 export async function finishSession(answered, correct, now = Date.now()) {
-  if (answered <= 0) return;
+  if (answered <= 0) return { unlocked: [] };
   const dayStart = startOfDay(now).getTime();
   const { dailyGoal } = getSettings();
   const existing = await dbGet(STORES.studyDays, dayStart);
@@ -244,7 +250,9 @@ export async function finishSession(answered, correct, now = Date.now()) {
       completedGoal: answered >= dailyGoal,
     });
   }
+  const unlocked = await syncPathUnlocks();
   emit();
+  return { unlocked };
 }
 
 export async function studiedToday(now = Date.now()) {
@@ -305,7 +313,8 @@ function uniqueNameFrom(base, taken) {
 }
 
 // resolution: "replace" | "copy"
-export async function importDeck(dto, resolution) {
+// extra: { builtinKey, includeInMix, silent } — used by the built-in pattern path.
+export async function importDeck(dto, resolution, extra = {}) {
   const decks = await dbGetAll(STORES.decks);
   const takenNames = new Set(decks.map((d) => d.name));
   let name = dto.deck_name;
@@ -322,13 +331,29 @@ export async function importDeck(dto, resolution) {
     name,
     sourceType: dto.source_type,
     createdAt: Date.now(),
-    includeInMix: true,
+    includeInMix: extra.includeInMix ?? true,
+    ...(dto.guide && typeof dto.guide === "object" ? { guide: dto.guide } : {}),
+    ...(extra.builtinKey ? { builtinKey: extra.builtinKey } : {}),
+  };
+
+  // Ids from the JSON are kept when they're valid UUIDs AND not already in
+  // use. Without the second check, importing a copy of an exported deck would
+  // silently move the original deck's questions (same keys) into the copy.
+  const [existingItemIds, existingQuestionIds] = await Promise.all([
+    dbGetAll(STORES.items).then((rows) => new Set(rows.map((r) => r.id))),
+    dbGetAll(STORES.questions).then((rows) => new Set(rows.map((r) => r.id))),
+  ]);
+  const keepId = (id, taken) => {
+    const ok = UUID_RE.test(String(id || "")) && !taken.has(id);
+    const out = ok ? id : uuid();
+    taken.add(out);
+    return out;
   };
 
   const items = [];
   const questions = [];
   for (const it of dto.items) {
-    const itemId = UUID_RE.test(String(it.id || "")) ? it.id : uuid();
+    const itemId = keepId(it.id, existingItemIds);
     items.push({
       id: itemId,
       deckId,
@@ -338,7 +363,7 @@ export async function importDeck(dto, resolution) {
       context: it.context || "",
     });
     for (const q of it.questions) {
-      const qId = UUID_RE.test(String(q.id || "")) ? q.id : uuid();
+      const qId = keepId(q.id, existingQuestionIds);
       questions.push({
         id: qId,
         itemId,
@@ -356,7 +381,7 @@ export async function importDeck(dto, resolution) {
   await dbBulkPut(STORES.items, items);
   await dbBulkPut(STORES.questions, questions);
 
-  emit();
+  if (!extra.silent) emit();
   return { deck, itemCount: items.length, questionCount: questions.length };
 }
 
@@ -473,6 +498,138 @@ export async function moveRoadmapNode(roadmapId, nodeId, direction) {
   [roadmap.nodes[idx], roadmap.nodes[target]] = [roadmap.nodes[target], roadmap.nodes[idx]];
   await dbPut(STORES.roadmaps, roadmap);
   emit();
+}
+
+// ---------- Built-in LeetCode Patterns path ----------
+// One deck per pattern plus a roadmap marked `builtin`, whose nodes unlock in
+// order: a stage opens (and joins the daily mix) once the stage before it has
+// every question studied at least once.
+
+export async function getPatternPath() {
+  const roadmaps = await dbGetAll(STORES.roadmaps);
+  return roadmaps.find((r) => r.builtin === PATTERN_PATH.key) || null;
+}
+
+// Idempotent: re-running it recreates any pattern deck that was deleted and
+// re-links it, without duplicating decks that still exist or touching progress.
+export async function installPatternPath() {
+  const [decks, existing] = await Promise.all([dbGetAll(STORES.decks), getPatternPath()]);
+  const deckByKey = new Map(decks.filter((d) => d.builtinKey).map((d) => [d.builtinKey, d]));
+
+  const deckFor = async (pattern, i) => {
+    const have = deckByKey.get(pattern.id);
+    if (have) return have;
+    const { deck } = await importDeck(buildPatternDeck(pattern, i), "copy", {
+      builtinKey: pattern.id,
+      includeInMix: i === 0,
+      silent: true,
+    });
+    return deck;
+  };
+
+  let roadmap = existing;
+  if (roadmap) {
+    const deckIds = new Set(decks.map((d) => d.id));
+    for (const node of roadmap.nodes) {
+      if (!node.patternId || (node.deckId && deckIds.has(node.deckId))) continue;
+      const idx = PATTERNS.findIndex((p) => p.id === node.patternId);
+      if (idx >= 0) node.deckId = (await deckFor(PATTERNS[idx], idx)).id;
+    }
+  } else {
+    const nodes = [];
+    for (const [i, p] of PATTERNS.entries()) {
+      const deck = await deckFor(p, i);
+      nodes.push({ id: uuid(), title: p.name, description: p.tagline, deckId: deck.id, patternId: p.id, unlocked: i === 0 });
+    }
+    roadmap = { id: uuid(), name: PATTERN_PATH.name, builtin: PATTERN_PATH.key, createdAt: Date.now(), nodes };
+  }
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+  return roadmap;
+}
+
+// Unlocks every built-in path stage whose previous stage is fully studied.
+// Returns the titles that were newly unlocked. Never re-locks anything, and
+// only ever turns "include in daily mix" ON — a manual opt-out made after
+// unlocking is left alone.
+export async function syncPathUnlocks() {
+  const roadmaps = (await dbGetAll(STORES.roadmaps)).filter((r) => r.builtin);
+  if (roadmaps.length === 0) return [];
+  const decks = await listDecks();
+  const byId = new Map(decks.map((d) => [d.id, d]));
+  const unlocked = [];
+  for (const r of roadmaps) {
+    let changed = false;
+    let prevDone = true;
+    for (const node of r.nodes) {
+      const deck = node.deckId ? byId.get(node.deckId) : null;
+      if (prevDone && !node.unlocked) {
+        node.unlocked = true;
+        changed = true;
+        unlocked.push(node.title);
+        if (deck && deck.includeInMix === false) {
+          const raw = await dbGet(STORES.decks, deck.id);
+          if (raw) await dbPut(STORES.decks, { ...raw, includeInMix: true });
+        }
+      }
+      prevDone = !!deck && deck.studiedFraction >= 0.999;
+    }
+    if (changed) await dbPut(STORES.roadmaps, r);
+  }
+  return unlocked;
+}
+
+// ---------- Daily challenge records ----------
+// { dayStart, challengeId, questionIds, score?, total?, bestScore?, completedAt?, plays? }
+
+export const listChallengeRecords = () => dbGetAll(STORES.challenges);
+
+// Today's challenge with its question set frozen on first view, so answering
+// (which changes review state, and so the gauntlet / weak-spot ordering)
+// doesn't reshuffle the set mid-day. `pick` is challenge.js#pickChallenge.
+export async function getTodaysChallenge(def, pick, now = Date.now()) {
+  const dayStart = startOfDay(now).getTime();
+  const [pool, record] = await Promise.all([getAllQuestionsFlat(), dbGet(STORES.challenges, dayStart)]);
+  const byId = new Map(pool.map((q) => [q.id, q]));
+
+  if (record && record.challengeId === def.id && record.questionIds?.every((id) => byId.has(id))) {
+    return {
+      def,
+      questions: record.questionIds.map((id) => byId.get(id)),
+      themed: record.themed !== false,
+      focus: record.focus,
+      record,
+    };
+  }
+
+  const picked = pick(pool, def, now);
+  if (picked.questions.length === 0) return { ...picked, record: null };
+  const fresh = {
+    ...(record || {}),
+    dayStart,
+    challengeId: def.id,
+    questionIds: picked.questions.map((q) => q.id),
+    themed: picked.themed,
+    focus: picked.focus,
+  };
+  await dbPut(STORES.challenges, fresh);
+  return { ...picked, record: fresh };
+}
+
+export async function saveChallengeResult(def, score, total, now = Date.now()) {
+  const dayStart = startOfDay(now).getTime();
+  const rec = (await dbGet(STORES.challenges, dayStart)) || { dayStart, challengeId: def.id };
+  const next = {
+    ...rec,
+    score,
+    total,
+    bestScore: Math.max(score, rec.bestScore ?? 0),
+    completedAt: rec.completedAt || now,
+    plays: (rec.plays || 0) + 1,
+  };
+  await dbPut(STORES.challenges, next);
+  emit();
+  return next;
 }
 
 export async function loadSampleDeck(kind) {
