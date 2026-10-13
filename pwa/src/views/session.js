@@ -132,7 +132,7 @@ export function runSession(queue, opts = {}) {
       });
       backBtn.disabled = state.viewIndex === 0;
       combo.hidden = !opts.showCombo || state.combo < 2;
-      combo.textContent = `🔥 ${state.combo}`;
+      combo.textContent = `${state.combo} in a row`;
     }
 
     async function paintFlag() {
@@ -325,7 +325,7 @@ export function runSession(queue, opts = {}) {
     function feedbackBox(q, fb, chosen) {
       const box = h("div", { class: `feedback ${fb.correct ? "correct" : "wrong"}` });
       const title = fb.correct ? "Correct" : chosen === TIMED_OUT ? "Time's up" : "Not quite";
-      box.appendChild(h("div", { class: "fb-title" }, (fb.correct ? "✓ " : "✕ ") + title));
+      box.appendChild(h("div", { class: "fb-title" }, title));
       if (!fb.correct) box.appendChild(h("div", { class: "fb-answer" }, `Answer: ${q.choices[q.correctIndex]}`));
       if (q.explanation) box.appendChild(h("div", { class: "fb-exp" }, q.explanation));
 
@@ -370,7 +370,7 @@ export function runSession(queue, opts = {}) {
       const color = rate >= 0.8 ? "var(--green)" : rate >= 0.5 ? "var(--accent)" : "var(--orange)";
 
       const summary = h("div", { class: "summary" });
-      summary.appendChild(ring(rate, { size: 148, stroke: 13, color, label: pct(rate), sub: "accuracy" }));
+      summary.appendChild(ring(rate, { size: 170, color, label: String(Math.round(rate * 100)), unit: "%", sub: `Accuracy · ${state.correct} of ${answered}` }));
       summary.appendChild(h("h2", { class: "summary-title" }, headline(rate)));
       summary.appendChild(h("p", { class: "small muted" }, summaryMessage(rate)));
       summary.appendChild(
@@ -409,7 +409,7 @@ export function runSession(queue, opts = {}) {
               "div",
               { class: "miss" },
               h("div", { class: "miss-prompt" }, q.itemTitle ? `${q.itemTitle} — ${q.prompt}` : q.prompt),
-              h("div", { class: "miss-answer" }, "✓ ", q.choices[q.correctIndex]),
+              h("div", { class: "miss-answer" }, "→ ", q.choices[q.correctIndex]),
               q.explanation ? h("div", { class: "fb-exp" }, q.explanation) : null
             )
           );

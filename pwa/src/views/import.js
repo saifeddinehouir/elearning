@@ -248,7 +248,7 @@ export function openImport(prefill = "") {
 
     body.append(
       promptDetails("🤖 No content yet? Copy the deck generator prompt for ChatGPT / Claude", PROMPT_TEMPLATE),
-      promptDetails("🗺️ Planning a curriculum? Copy the roadmap generator prompt instead", ROADMAP_PROMPT_TEMPLATE),
+      promptDetails("Planning a curriculum? Copy the roadmap generator prompt instead", ROADMAP_PROMPT_TEMPLATE),
       h("label", { class: "field" }, h("span", {}, "Paste JSON (a deck or a roadmap)"), ta),
       h("div", { class: "row", style: "margin:8px 0" }, validatePasteBtn),
       fileInput,

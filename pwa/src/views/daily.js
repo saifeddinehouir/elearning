@@ -68,7 +68,8 @@ function greeting() {
   return "Good evening";
 }
 
-// Hero: ring for today's goal, streak, and what the session holds.
+// Hero: today's count as a big numeral over its goal, then ruled rows for
+// streak and what the session holds.
 function goalCard(pool, config, goal, answeredToday, streakN) {
   const comp = composeSession(pool, config);
   const reached = answeredToday >= goal;
@@ -79,28 +80,18 @@ function goalCard(pool, config, goal, answeredToday, streakN) {
       "div",
       { class: "hero-top" },
       ring(answeredToday / goal, {
-        size: 112,
-        stroke: 11,
-        color: reached ? "var(--green)" : "var(--accent)",
-        label: String(answeredToday),
-        sub: `of ${goal} today`,
+        size: 150,
+        color: reached ? "var(--accent)" : "var(--ink)",
+        label: String(answeredToday).padStart(2, "0"),
+        unit: `/${goal}`,
+        sub: reached ? "Daily goal reached" : "Answered today",
       }),
       h(
         "div",
-        { class: "hero-stats" },
-        h(
-          "div",
-          { class: "hero-stat" },
-          h("span", { class: "hero-v", style: streakN > 0 ? "color:var(--orange)" : "" }, `🔥 ${streakN}`),
-          h("span", { class: "hero-l" }, "day streak")
-        ),
-        h(
-          "div",
-          { class: "hero-pills" },
-          pill("var(--accent)", comp.due, "due"),
-          pill("var(--purple)", comp.new, "new"),
-          comp.ahead > 0 ? pill("var(--teal)", comp.ahead, "ahead") : null
-        )
+        { class: "stat-rows" },
+        statRow("Streak", `${streakN} day${streakN === 1 ? "" : "s"}`, streakN === 0),
+        statRow("Due · New", `${comp.due} · ${comp.new}`, comp.due + comp.new === 0),
+        comp.ahead > 0 ? statRow("Review ahead", String(comp.ahead)) : null
       )
     )
   );
@@ -121,23 +112,17 @@ function goalCard(pool, config, goal, answeredToday, streakN) {
         onclick: () => startSession(pool, config),
       },
       comp.total === 0
-        ? "All caught up 🎉"
+        ? "All caught up"
         : answeredToday > 0
-        ? `Study more · ${comp.total} questions`
-        : `Start daily session · ${comp.total} questions`
+        ? `Study more · ${comp.total}`
+        : `Start session · ${comp.total}`
     )
   );
-  if (reached) card.appendChild(h("p", { class: "small muted", style: "text-align:center;margin-top:8px" }, "Daily goal reached. Anything more is a bonus."));
   return card;
 }
 
-function pill(color, n, label) {
-  return h(
-    "span",
-    { class: `pill${n === 0 ? " zero" : ""}`, style: `--pc:${color}` },
-    h("strong", {}, String(n)),
-    ` ${label}`
-  );
+function statRow(label, value, zero = false) {
+  return h("div", { class: "stat-row" }, h("span", {}, label), h("b", { class: zero ? "zero" : "" }, value));
 }
 
 // "Up next" for a built-in pattern path: the first stage not finished yet.
@@ -153,7 +138,7 @@ function upNextCard(path, decks) {
       "div",
       { class: cls, role: "button", tabindex: "0", onclick: () => openRoadmapDetail(path.id) },
       h("div", { class: "kicker" }, path.name),
-      h("div", { class: "promo-title" }, "🎉 Every pattern studied"),
+      h("div", { class: "promo-title" }, "Every pattern studied"),
       h("p", { class: "small muted", style: "margin-top:4px" }, "Reviews keep coming back on schedule. Skim the cheat sheet before an interview.")
     );
   }
@@ -175,7 +160,7 @@ function upNextCard(path, decks) {
       h(
         "div",
         { class: "spacer" },
-        h("div", { class: "kicker" }, `${path.name} · stage ${idx + 1} of ${total}`),
+        h("div", { class: "kicker" }, `${path.name} · Stage ${String(idx + 1).padStart(2, "0")}/${total}`),
         h("div", { class: "promo-title" }, node.title),
         h("div", { class: "small muted", style: "margin-top:2px" }, node.description)
       ),
@@ -200,11 +185,11 @@ function welcome() {
     h(
       "div",
       { class: "card hero welcome" },
-      h("div", { class: "welcome-emoji" }, "🧠"),
-      h("div", { class: "promo-title", style: "text-align:center" }, "Learn it once. Remember it for good."),
+      h("div", { class: "kicker" }, "Spaced repetition · LeetCode patterns"),
+      h("div", { class: "promo-title" }, "Learn it once. Remember it for good."),
       h(
         "p",
-        { class: "small muted", style: "text-align:center;margin:6px 0 4px" },
+        { class: "muted", style: "margin:10px 0 0;max-width:40ch" },
         "Short daily sessions, scheduled by spaced repetition, plus a fresh challenge every day."
       )
     )
@@ -240,7 +225,7 @@ function welcome() {
   box.appendChild(
     h(
       "div",
-      { class: "row", style: "justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px" },
+      { class: "row", style: "gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)" },
       h("span", { class: "small muted" }, "Just looking?"),
       h("button", { class: "link-btn", onclick: () => sample("course") }, "Load a course sample")
     )

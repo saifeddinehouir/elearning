@@ -17,9 +17,9 @@ export async function renderStreak() {
     h(
       "div",
       { class: "tiles" },
-      tile(curStreak, "Current streak", curStreak > 0 ? "var(--orange)" : null),
-      tile(longStreak, "Longest streak", longStreak > 0 ? "var(--orange)" : null),
-      tile(daysStudied, "Days studied", daysStudied > 0 ? "var(--accent)" : null)
+      tile(curStreak, "Current streak", curStreak > 0 ? "var(--accent)" : null),
+      tile(longStreak, "Longest streak", null),
+      tile(daysStudied, "Days studied", null)
     )
   );
 

@@ -28,9 +28,9 @@ export function horizontalBars(data, { width = 320 } = {}) {
   data.forEach((d, i) => {
     const y = i * rowH + 6;
     svg.appendChild(el("text", { x: labelW - 8, y: y + 15, "text-anchor": "end", class: "bar-lbl" }, trunc(d.label, 14)));
-    svg.appendChild(el("rect", { x: labelW, y: y + 4, width: trackW, height: 14, rx: 4, fill: "var(--surface-2)" }));
+    svg.appendChild(el("rect", { x: labelW, y: y + 4, width: trackW, height: 14, fill: "var(--surface-2)" }));
     svg.appendChild(
-      el("rect", { x: labelW, y: y + 4, width: Math.max(2, trackW * d.rate), height: 14, rx: 4, fill: rateColor(d.rate) })
+      el("rect", { x: labelW, y: y + 4, width: Math.max(2, trackW * d.rate), height: 14, fill: rateColor(d.rate) })
     );
     svg.appendChild(
       el("text", { x: width, y: y + 15, "text-anchor": "end", class: "bar-val" }, `${pct(d.rate)}·${d.total}`)
@@ -56,7 +56,7 @@ export function verticalBars(data, { width = 320, height = 150 } = {}) {
     const x = gap + i * (barW + gap);
     const h = (height - padT - padB) * d.rate;
     const y = height - padB - h;
-    svg.appendChild(el("rect", { x, y, width: barW, height: Math.max(2, h), rx: 4, fill: rateColor(d.rate) }));
+    svg.appendChild(el("rect", { x, y, width: barW, height: Math.max(2, h), fill: rateColor(d.rate) }));
     svg.appendChild(el("text", { x: x + barW / 2, y: height - 6, "text-anchor": "middle", class: "bar-lbl" }, d.label));
     svg.appendChild(el("text", { x: x + barW / 2, y: y - 4, "text-anchor": "middle", class: "bar-val" }, pct(d.rate)));
   });
@@ -65,7 +65,7 @@ export function verticalBars(data, { width = 320, height = 150 } = {}) {
 
 // points: [{ day, rate, answered }] — line of accuracy over time
 export function lineChart(points, { width = 320, height = 160 } = {}) {
-  const padL = 28;
+  const padL = 36;
   const padB = 20;
   const padT = 12;
   const plotted = points.filter((p) => p.answered > 0);
@@ -162,43 +162,44 @@ function level(rec, maxAnswered) {
   return 4;
 }
 
-// A progress ring with a centred label. fraction: 0..1. The arc animates in
-// from empty on first paint.
-export function ring(fraction, { size = 120, stroke = 12, color = "var(--accent)", label = "", sub = "" } = {}) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
+// A key figure: a large numeral (plus an optional smaller unit such as "/15"),
+// a caption, and a thin meter showing `fraction` (0..1). `size` scales the
+// numeral; `color` fills the meter. Kept under the old name `ring` so callers
+// didn't change when the round progress ring was dropped.
+export function ring(fraction, { size = 120, color = "var(--ink)", label = "", unit = "", sub = "", meter = true } = {}) {
   const f = Math.max(0, Math.min(1, fraction || 0));
-  const svg = el("svg", { viewBox: `0 0 ${size} ${size}`, width: size, height: size, "aria-hidden": "true" });
-  svg.appendChild(el("circle", { cx: size / 2, cy: size / 2, r, fill: "none", stroke: "var(--surface-3)", "stroke-width": stroke }));
-  const arc = el("circle", {
-    cx: size / 2,
-    cy: size / 2,
-    r,
-    fill: "none",
-    stroke: color,
-    "stroke-width": stroke,
-    "stroke-linecap": "round",
-    "stroke-dasharray": c.toFixed(2),
-    "stroke-dashoffset": c.toFixed(2),
-    transform: `rotate(-90 ${size / 2} ${size / 2})`,
-    class: "ring-arc",
-  });
-  svg.appendChild(arc);
-  requestAnimationFrame(() => requestAnimationFrame(() => arc.setAttribute("stroke-dashoffset", (c * (1 - f)).toFixed(2))));
-
   const div = document.createElement("div");
   div.className = "ring";
-  div.style.width = `${size}px`;
-  div.style.height = `${size}px`;
+  div.style.setProperty("--fs", `${Math.round(size * 0.62)}px`);
   div.setAttribute("role", "img");
-  div.setAttribute("aria-label", `${label} ${sub}`.trim());
-  div.appendChild(svg);
-  const center = document.createElement("div");
-  center.className = "ring-center";
-  center.innerHTML = `<div class="ring-label"></div><div class="ring-sub"></div>`;
-  center.firstChild.textContent = label;
-  center.lastChild.textContent = sub;
-  div.appendChild(center);
+  div.setAttribute("aria-label", `${label}${unit} ${sub}`.trim());
+
+  const big = document.createElement("div");
+  big.className = "ring-label";
+  big.textContent = label;
+  if (unit) {
+    const u = document.createElement("span");
+    u.className = "ring-unit";
+    u.textContent = unit;
+    big.appendChild(u);
+  }
+  div.appendChild(big);
+
+  if (sub) {
+    const s = document.createElement("div");
+    s.className = "ring-sub";
+    s.textContent = sub;
+    div.appendChild(s);
+  }
+  if (meter) {
+    const m = document.createElement("div");
+    m.className = "ring-meter";
+    const fill = document.createElement("i");
+    fill.style.background = color;
+    m.appendChild(fill);
+    div.appendChild(m);
+    requestAnimationFrame(() => requestAnimationFrame(() => (fill.style.width = `${f * 100}%`)));
+  }
   return div;
 }
 

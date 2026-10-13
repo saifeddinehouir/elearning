@@ -15,7 +15,7 @@ export async function renderStats() {
 
   if (attempts.length === 0) {
     wrap.appendChild(
-      empty("📊", "No stats yet", "Finish a daily session and your accuracy by topic, difficulty and deck shows up here.")
+      empty("", "No stats yet", "Finish a daily session and your accuracy by topic, difficulty and deck shows up here.")
     );
     return wrap;
   }
@@ -31,13 +31,13 @@ export async function renderStats() {
       h(
         "div",
         { class: "hero-top" },
-        ring(o.rate, { size: 112, stroke: 11, color: rateVar(o.rate), label: pct(o.rate), sub: "all-time" }),
+        ring(o.rate, { size: 150, color: "var(--ink)", label: String(Math.round(o.rate * 100)), unit: "%", sub: "All-time accuracy" }),
         h(
           "div",
           { class: "hero-stats" },
-          stat(o.answered, "answered"),
-          stat(o.correct, "correct"),
-          stat(weekAnswered ? pct(weekCorrect / weekAnswered) : "—", "accuracy this week")
+          stat(o.answered, "Answered"),
+          stat(o.correct, "Correct"),
+          stat(weekAnswered ? pct(weekCorrect / weekAnswered) : "—", "Accuracy this week")
         )
       )
     )

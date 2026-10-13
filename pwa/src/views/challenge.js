@@ -23,7 +23,6 @@ export async function challengeCard({ onNeedContent } = {}) {
     h(
       "div",
       { class: "row", style: "align-items:flex-start;gap:14px" },
-      h("div", { class: "challenge-emoji", "aria-hidden": "true" }, def.emoji),
       h(
         "div",
         { class: "spacer" },
@@ -35,7 +34,7 @@ export async function challengeCard({ onNeedContent } = {}) {
           today.focus ? `${def.blurb} Today: ${today.focus}.` : def.blurb
         )
       ),
-      streak > 0 ? h("div", { class: "challenge-streak", title: "Challenge streak" }, `🔥 ${streak}`) : null
+      streak > 0 ? h("div", { class: "challenge-streak", title: "Challenge streak" }, `${streak}-day streak`) : null
     )
   );
 
@@ -83,7 +82,7 @@ export async function challengeCard({ onNeedContent } = {}) {
 
 function launch(def, questions, { practice = false } = {}) {
   runSession(questions, {
-    title: `${def.emoji} ${def.name}${practice ? " · replay" : ""}`,
+    title: `${def.name}${practice ? " · replay" : ""}`,
     practice,
     timeLimitSec: def.timeLimitSec,
     showCombo: true,
@@ -95,11 +94,11 @@ function launch(def, questions, { practice = false } = {}) {
         "div",
         { class: "card challenge-summary", style: `--c: var(--${def.color})` },
         h("div", { class: "kicker" }, perfect ? "Perfect run" : "Daily challenge complete"),
-        h("div", { class: "challenge-name" }, `${def.emoji} ${def.name} · ${correct}/${answered}`),
+        h("div", { class: "challenge-name" }, `${def.name} · ${correct}/${answered}`),
         h(
           "div",
           { class: "meta", style: "margin:8px 0 0" },
-          h("span", {}, `🔥 ${streak}-day challenge streak`),
+          h("span", {}, `${streak}-day challenge streak`),
           h("span", {}, `Best today ${rec.bestScore}/${answered}`)
         )
       );
@@ -121,7 +120,7 @@ function weekStrip(records) {
       return h(
         "div",
         { class: `wd ${state}`, title: CHALLENGES[dow].name },
-        h("span", { class: "wd-dot" }, state === "done" ? "✓" : CHALLENGES[dow].emoji),
+        h("span", { class: "wd-dot", "aria-hidden": "true" }),
         h("span", { class: "wd-l" }, DAY_LETTERS[dow])
       );
     })

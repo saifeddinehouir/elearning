@@ -48,14 +48,14 @@ export async function renderDecks() {
             toast(ok ? "Prompt copied — paste it into ChatGPT or Claude" : "Couldn't copy — open Import to copy it manually");
           },
         },
-        "📋 Copy the deck prompt"
+        "Copy the deck prompt"
       )
     )
   );
 
   if (decks.length === 0) {
     wrap.appendChild(
-      empty("🗂", "No decks", "Import a JSON deck, or load a sample to try the app.", {
+      empty("", "No decks", "Import a JSON deck, or load a sample to try the app.", {
         label: "Import a deck",
         onclick: () => openImport(),
       })
@@ -262,7 +262,7 @@ export async function openDeckDetail(deckId) {
               toast(ok ? "Deck JSON copied — paste it anywhere to back it up or re-import" : "Couldn't copy — check clipboard permissions");
             },
           },
-          "📋 Export JSON"
+          "Export JSON"
         ),
         h(
           "button",

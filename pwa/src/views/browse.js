@@ -54,8 +54,8 @@ function questionRow(q, flagsMap, { onFlagChange } = {}) {
 
   const flagRow = h("div", { class: "row", style: "gap:8px;margin-top:12px" });
   for (const [val, label] of [
-    ["confusing", "🤔 Confusing"],
-    ["wrong", "❌ Wrong"],
+    ["confusing", "Confusing"],
+    ["wrong", "Wrong"],
   ]) {
     flagRow.appendChild(
       h(
@@ -159,8 +159,7 @@ export async function openFlagged() {
           h(
             "div",
             { class: "empty" },
-            h("div", { class: "icon" }, "🚩"),
-            h("div", { class: "section-title" }, "No flagged questions"),
+                        h("div", { class: "section-title" }, "No flagged questions"),
             h("p", { class: "small" }, 'While studying, tap the flag icon to mark a question "confusing" or "wrong" — it shows up here.')
           )
         );

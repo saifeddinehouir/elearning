@@ -27,7 +27,11 @@ function applyTheme() {
   } else {
     delete document.documentElement.dataset.theme;
   }
+  // Match the browser / status bar to the page background.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#f2f2ee";
 }
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
 
 function tabFromHash() {
   const id = (location.hash || "").replace(/^#\/?/, "");

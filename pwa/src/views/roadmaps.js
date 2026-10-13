@@ -41,7 +41,7 @@ export function pathPromoCard(path = PATHS[0], { compact = false } = {}) {
     "div",
     { class: `card promo${pathClass(path.tone)}` },
     h("div", { class: "kicker" }, hard ? "Built-in path · challenging" : "Built-in path"),
-    h("div", { class: "promo-title" }, hard ? `🔥 ${path.name}` : path.name),
+    h("div", { class: "promo-title" }, path.name),
     h("p", { class: "small muted", style: "margin:4px 0 12px" }, path.blurb),
     compact
       ? null
@@ -85,7 +85,7 @@ export async function renderRoadmaps() {
 
   if (roadmaps.length === 0 && decks.length === 0) {
     wrap.appendChild(
-      empty("🗺️", "Or plan your own", "Copy the roadmap prompt below, plan a curriculum with ChatGPT or Claude, and import the result.")
+      empty("", "Or plan your own", "Copy the roadmap prompt below, plan a curriculum with ChatGPT or Claude, and import the result.")
     );
   } else {
     wrap.appendChild(roadmaps.length > 0 ? roadmapsSection(roadmaps, decks) : fallbackPathCard(decks));
@@ -130,14 +130,15 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
     // Built-in paths unlock in order. Locked stages stay tappable so you can
     // study ahead; they just aren't in the daily mix yet.
     const locked = !!(roadmap?.builtin && entry.node && !entry.node.unlocked);
-    const el = pathNode(entry, i === activeIdx, locked);
+    const el = pathNode(entry, i === activeIdx, locked, i);
     if (isDone(entry.deck)) el.classList.add("is-done");
     if (locked) el.classList.add("locked");
     path.appendChild(el);
   });
   return path;
 
-  function pathNode(entry, isActive, locked) {
+  function pathNode(entry, isActive, locked, index) {
+    const num = String(index + 1).padStart(2, "0");
     const { deck, node } = entry;
 
     if (!deck) {
@@ -155,7 +156,7 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
             }
           },
         },
-        h("div", { class: `roadmap-dot unattached${isActive ? " active" : ""}` }, h("div", { class: "roadmap-dot-inner" }, "+")),
+        h("div", { class: `roadmap-dot unattached${isActive ? " active" : ""}` }, num),
         h(
           "div",
           { class: "spacer roadmap-text" },
@@ -170,12 +171,8 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
     const pct = Math.round(deck.studiedFraction * 100);
     const done = isDone(deck);
     const status = done ? "done" : isActive ? "active" : "todo";
-    const ringColor = done ? "var(--green)" : "var(--accent)";
-    const inner = done
-      ? h("div", { class: "roadmap-dot-inner" }, "✓")
-      : locked
-      ? h("div", { class: "roadmap-dot-inner", html: ICONS.lock })
-      : h("div", { class: "roadmap-dot-inner" }, pct > 0 ? `${pct}%` : "Go");
+    const inner = locked ? h("span", { html: ICONS.lock }) : num;
+    const meter = done || locked ? null : h("div", { class: "stage-meter" }, h("i", { style: `width:${pct}%` }));
 
     return h(
       "div",
@@ -191,7 +188,7 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
           }
         },
       },
-      h("div", { class: `roadmap-dot ${status}`, style: `background: conic-gradient(${ringColor} ${pct}%, var(--surface-3) 0)` }, inner),
+      h("div", { class: `roadmap-dot ${status}`, "aria-label": `Stage ${num}` }, inner),
       h(
         "div",
         { class: "spacer roadmap-text" },
@@ -209,8 +206,9 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
                 `${Math.round(deck.mastery * 100)}% mastery${deck.mastery >= MASTERY ? "" : ` · need ${Math.round(MASTERY * 100)}%`}`
               )
             : null,
-          locked ? h("span", { class: "badge" }, "Locked") : isActive && !done ? h("span", { class: "badge accent" }, "Up next") : null
-        )
+          done ? h("span", { class: "badge" }, "Done") : locked ? h("span", { class: "badge" }, "Locked") : isActive ? h("span", { class: "badge accent" }, "Up next") : pct > 0 ? h("span", {}, `${pct}% seen`) : null
+        ),
+        meter
       ),
       h("span", { class: "chevron", html: ICONS.chevron })
     );
@@ -275,7 +273,7 @@ function roadmapsSection(roadmaps, decks) {
             "div",
             { class: "meta" },
             h("span", {}, `${done}/${total} stage${total === 1 ? "" : "s"}`),
-            next ? h("span", { style: "color:var(--accent);font-weight:600" }, `Next: ${next.title}`) : h("span", {}, "🎉 Finished")
+            next ? h("span", { style: "color:var(--accent);font-weight:600" }, `Next: ${next.title}`) : h("span", {}, "Finished")
           )
         ),
         h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
@@ -376,11 +374,11 @@ export function openRoadmapDetail(roadmapId) {
           "div",
           { class: "row", style: "gap:16px;align-items:center" },
           ring(frac, {
-            size: 84,
-            stroke: 9,
-            color: frac >= 1 ? "var(--green)" : tone === "hard" ? "var(--red)" : "var(--purple)",
-            label: `${done}`,
-            sub: `of ${total}`,
+            size: 96,
+            color: tone === "hard" ? "var(--bad)" : "var(--ink)",
+            label: String(done).padStart(2, "0"),
+            unit: `/${total}`,
+            sub: "Stages done",
           }),
           h(
             "div",
@@ -518,7 +516,7 @@ function openAttachDeckPicker(roadmap, node, decks, onAttached) {
     if (decks.length === 0) {
       body.appendChild(
         empty(
-          "🗂",
+          "",
           "No decks yet",
           `Generate a deck for "${node.title}" with the deck prompt, import it, then come back here to attach it.`,
           { label: "Import a deck", onclick: () => openImport() }

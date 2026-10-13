@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DailyQCM">
-  <rect width="512" height="512" rx="112" fill="#3780EC"/>
-  <path d="M150 270 L220 340 L372 168" fill="none" stroke="#ffffff" stroke-width="40"
-        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" fill="#2541FF"/>
+  <rect x="96" y="128" width="176" height="40" fill="#FFFFFF"/>
+  <rect x="96" y="200" width="320" height="40" fill="#FFFFFF"/>
+  <rect x="96" y="272" width="240" height="40" fill="#FFFFFF"/>
+  <rect x="96" y="344" width="144" height="40" fill="#FFFFFF"/>
 </svg>
