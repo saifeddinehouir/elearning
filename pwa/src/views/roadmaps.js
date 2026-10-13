@@ -15,45 +15,54 @@ import { openImport } from "./import.js";
 import { openDeckDetail } from "./decks.js";
 import { empty } from "./daily.js";
 import { ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
-import { PATTERNS, PATTERN_PATH } from "../patterns.js";
+import { PATHS, PATTERN_PATH, pathByKey, isStageDone, MASTERY } from "../patterns.js";
 import { openCheatSheet } from "./guide.js";
+import { ring } from "../charts.js";
 
-const isDone = (deck) => !!deck && deck.studiedFraction >= 0.999;
+// The unlock rule a roadmap's stages are judged by ("seen" for your own roadmaps).
+const ruleOf = (roadmap) => (roadmap?.builtin && pathByKey.get(roadmap.builtin)?.unlock) || "seen";
+const toneOf = (roadmap) => (roadmap?.builtin && pathByKey.get(roadmap.builtin)?.tone) || null;
+export const pathClass = (tone) => (tone ? ` builtin-path${tone === "hard" ? " hard" : ""}` : "");
 
-// Installs (or repairs) the built-in LeetCode Patterns path and opens it.
-export async function installAndOpenPath() {
-  const roadmap = await installPatternPath();
-  toast("LeetCode Patterns path ready — stage 1 is in your daily mix");
+// Installs (or repairs) a built-in path and opens it. Safe as a click handler:
+// a non-string argument (the click event) means the core path.
+export async function installAndOpenPath(key) {
+  const path = pathByKey.get(typeof key === "string" ? key : PATTERN_PATH.key);
+  const roadmap = await installPatternPath(path.key);
+  toast(`${path.name} ready — stage 1 is in your daily mix`);
   openRoadmapDetail(roadmap.id);
 }
 
-// Promo shown until the built-in path is installed.
-export function pathPromoCard() {
-  const questions = PATTERNS.reduce((n, p) => n + p.problems.length * 2, 0);
+// Promo shown until a built-in path is installed.
+export function pathPromoCard(path = PATHS[0], { compact = false } = {}) {
+  const questions = path.patterns.reduce((n, p) => n + p.problems.length * 2, 0);
+  const hard = path.tone === "hard";
   return h(
     "div",
-    { class: "card promo" },
-    h("div", { class: "kicker" }, "Built-in path"),
-    h("div", { class: "promo-title" }, PATTERN_PATH.name),
-    h("p", { class: "small muted", style: "margin:4px 0 12px" }, PATTERN_PATH.blurb),
-    h(
-      "div",
-      { class: "promo-chips" },
-      ...PATTERNS.slice(0, 6).map((p) => h("span", { class: "chip" }, p.name)),
-      h("span", { class: "chip faint" }, `+${PATTERNS.length - 6} more`)
-    ),
+    { class: `card promo${pathClass(path.tone)}` },
+    h("div", { class: "kicker" }, hard ? "Built-in path · challenging" : "Built-in path"),
+    h("div", { class: "promo-title" }, hard ? `🔥 ${path.name}` : path.name),
+    h("p", { class: "small muted", style: "margin:4px 0 12px" }, path.blurb),
+    compact
+      ? null
+      : h(
+          "div",
+          { class: "promo-chips" },
+          ...path.patterns.slice(0, 6).map((p) => h("span", { class: "chip" }, p.name)),
+          h("span", { class: "chip faint" }, `+${path.patterns.length - 6} more`)
+        ),
     h(
       "div",
       { class: "meta", style: "margin:12px 0" },
-      h("span", {}, `${PATTERNS.length} stages`),
+      h("span", {}, `${path.patterns.length} stages`),
       h("span", {}, `${questions} questions`),
-      h("span", {}, "unlocks as you go")
+      h("span", {}, path.unlock === "mastery" ? `unlock at ${Math.round(MASTERY * 100)}% mastery` : "unlocks as you go")
     ),
     h(
       "div",
       { class: "row", style: "gap:10px" },
-      h("button", { class: "btn primary block", onclick: installAndOpenPath }, "Start the path"),
-      h("button", { class: "btn", onclick: openCheatSheet }, "Cheat sheet")
+      h("button", { class: `btn ${hard ? "hard-btn" : "primary"} block`, onclick: () => installAndOpenPath(path.key) }, hard ? "Take the challenge" : "Start the path"),
+      h("button", { class: "btn", onclick: () => openCheatSheet(path.key) }, "Cheat sheet")
     )
   );
 }
@@ -70,7 +79,9 @@ export async function renderRoadmaps() {
     )
   );
 
-  if (!roadmaps.some((r) => r.builtin === PATTERN_PATH.key)) wrap.appendChild(pathPromoCard());
+  for (const path of PATHS) {
+    if (!roadmaps.some((r) => r.builtin === path.key)) wrap.appendChild(pathPromoCard(path));
+  }
 
   if (roadmaps.length === 0 && decks.length === 0) {
     wrap.appendChild(
@@ -111,6 +122,8 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
         .sort((a, b) => a.createdAt - b.createdAt)
         .map((d) => ({ title: d.name, subtitle: null, node: null, deck: d }));
 
+  const rule = ruleOf(roadmap);
+  const isDone = (deck) => isStageDone(deck, rule);
   const activeIdx = entries.findIndex((e) => !isDone(e.deck));
   const path = h("div", { class: "roadmap" });
   entries.forEach((entry, i) => {
@@ -189,6 +202,13 @@ function renderPathNodes(decks, roadmap, { onAttached } = {}) {
           { class: "row small muted", style: "gap:8px;margin-top:4px;flex-wrap:wrap" },
           h("span", {}, `${deck.questionCount} questions`),
           deck.dueCount > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${deck.dueCount} due`) : null,
+          rule === "mastery" && deck.studiedFraction > 0
+            ? h(
+                "span",
+                { class: `mastery${deck.mastery >= MASTERY ? " ok" : ""}` },
+                `${Math.round(deck.mastery * 100)}% mastery${deck.mastery >= MASTERY ? "" : ` · need ${Math.round(MASTERY * 100)}%`}`
+              )
+            : null,
           locked ? h("span", { class: "badge" }, "Locked") : isActive && !done ? h("span", { class: "badge accent" }, "Up next") : null
         )
       ),
@@ -225,12 +245,13 @@ function roadmapsSection(roadmaps, decks) {
   const ordered = [...roadmaps].sort((a, b) => (b.builtin ? 1 : 0) - (a.builtin ? 1 : 0) || b.createdAt - a.createdAt);
   for (const rm of ordered) {
     const total = rm.nodes.length;
+    const isDone = (deck) => isStageDone(deck, ruleOf(rm));
     const done = rm.nodes.filter((n) => isDone(n.deckId ? deckById.get(n.deckId) : null)).length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     const next = rm.nodes.find((n) => !isDone(n.deckId ? deckById.get(n.deckId) : null));
 
     const card = h("div", {
-      class: `card deck${rm.builtin ? " builtin-path" : ""}`,
+      class: `card deck${pathClass(toneOf(rm))}`,
       role: "button",
       tabindex: "0",
       onclick: () => openRoadmapDetail(rm.id),
@@ -245,7 +266,7 @@ function roadmapsSection(roadmaps, decks) {
       h(
         "div",
         { class: "row", style: "align-items:flex-start" },
-        h("span", { class: `icon-chip ${rm.builtin ? "c-purple" : "c-teal"}`, html: rm.builtin ? ICONS.code : ICONS.map }),
+        h("span", { class: `icon-chip ${toneOf(rm) === "hard" ? "c-red" : rm.builtin ? "c-purple" : "c-teal"}`, html: rm.builtin ? ICONS.code : ICONS.map }),
         h(
           "div",
           { class: "spacer" },
@@ -338,32 +359,45 @@ export function openRoadmapDetail(roadmapId) {
 
     function detailHeader() {
       const deckById = new Map(decks.map((d) => [d.id, d]));
+      const rule = ruleOf(roadmap);
+      const tone = toneOf(roadmap);
       const total = roadmap.nodes.length;
-      const done = roadmap.nodes.filter((n) => isDone(n.deckId ? deckById.get(n.deckId) : null)).length;
+      const done = roadmap.nodes.filter((n) => isStageDone(n.deckId ? deckById.get(n.deckId) : null, rule)).length;
       const questions = roadmap.nodes.reduce((s, n) => s + (deckById.get(n.deckId)?.questionCount || 0), 0);
-      const prog = h("div", { class: "progress", style: "margin-top:12px" }, h("i", {}));
-      prog.firstChild.style.width = `${total ? (done / total) * 100 : 0}%`;
+      const frac = total ? done / total : 0;
+      const how =
+        rule === "mastery"
+          ? `A stage opens once you've seen every question in the one before it and got at least ${Math.round(MASTERY * 100)}% right on your latest try. Locked stages can still be studied on their own.`
+          : "A stage joins your daily mix once you've seen every question in the stage before it. You can still study locked stages on their own.";
       return h(
         "div",
-        { class: `card${roadmap.builtin ? " builtin-path" : ""}` },
-        h("div", { class: "kicker" }, roadmap.builtin ? "Built-in path" : "Your roadmap"),
-        h("div", { class: "promo-title" }, roadmap.name),
+        { class: `card${pathClass(tone)}` },
         h(
           "div",
-          { class: "meta", style: "margin:6px 0 0" },
-          h("span", {}, `${done}/${total} stages complete`),
-          h("span", {}, `${questions} questions`)
-        ),
-        prog,
-        roadmap.builtin
-          ? h(
-              "p",
-              { class: "small muted", style: "margin-top:10px" },
-              "A stage joins your daily mix once you've seen every question in the stage before it. You can still study locked stages on their own."
+          { class: "row", style: "gap:16px;align-items:center" },
+          ring(frac, {
+            size: 84,
+            stroke: 9,
+            color: frac >= 1 ? "var(--green)" : tone === "hard" ? "var(--red)" : "var(--purple)",
+            label: `${done}`,
+            sub: `of ${total}`,
+          }),
+          h(
+            "div",
+            { class: "spacer" },
+            h("div", { class: "kicker" }, tone === "hard" ? "Built-in path · challenging" : roadmap.builtin ? "Built-in path" : "Your roadmap"),
+            h("div", { class: "promo-title" }, roadmap.name),
+            h(
+              "div",
+              { class: "meta", style: "margin:4px 0 0" },
+              h("span", {}, `${done}/${total} stages complete`),
+              h("span", {}, `${questions} questions`)
             )
-          : null,
+          )
+        ),
+        roadmap.builtin ? h("p", { class: "small muted", style: "margin-top:12px" }, how) : null,
         roadmap.builtin
-          ? h("button", { class: "btn block mt", onclick: openCheatSheet }, h("span", { html: ICONS.list }), "Pattern cheat sheet")
+          ? h("button", { class: "btn block mt", onclick: () => openCheatSheet(roadmap.builtin) }, h("span", { html: ICONS.list }), "Pattern cheat sheet")
           : null
       );
     }

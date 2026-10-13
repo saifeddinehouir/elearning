@@ -57,26 +57,34 @@ function updateBanner() {
   );
 }
 
+let lastRenderedTab = null;
+let renderSeq = 0;
+
+// Builds the next view off-screen and swaps it in only once it's ready, so a
+// re-render (every store change triggers one) never flashes an empty page.
+// The enter animation plays only when the tab actually changed.
 async function render() {
+  const seq = ++renderSeq;
   const tab = TABS.find((t) => t.id === current) || TABS[0];
 
-  const shell = h("div", {}, h("div", { id: "view" }));
-  clear(appRoot).appendChild(shell);
-  appRoot.appendChild(tabbar());
-
-  const view = shell.querySelector("#view");
+  const view = h("div", { id: "view", class: lastRenderedTab === tab.id ? "" : "view-enter" });
   const upd = updateBanner();
   if (upd) view.appendChild(upd);
   const banner = nudgeBanner();
   if (banner) view.appendChild(banner);
 
   try {
-    const content = await tab.render();
-    view.appendChild(content);
+    view.appendChild(await tab.render());
   } catch (err) {
     console.error(err);
     view.appendChild(h("div", { class: "empty" }, "Something went wrong: " + err.message));
   }
+  if (seq !== renderSeq) return; // a newer render started while this one awaited
+
+  const scrollY = lastRenderedTab === tab.id ? window.scrollY : 0;
+  clear(appRoot).append(view, tabbar());
+  window.scrollTo(0, scrollY);
+  lastRenderedTab = tab.id;
 }
 
 function tabbar() {

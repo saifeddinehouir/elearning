@@ -11,6 +11,7 @@
 // installs. Pure, no DOM.
 
 import { rngFor, seededShuffle, stableUuid } from "./random.js";
+import { ADVANCED_PATTERNS } from "./patterns-advanced.js";
 
 export const PATTERN_PATH = {
   key: "lc-patterns",
@@ -1288,7 +1289,41 @@ return res`,
   },
 ];
 
-export const patternById = new Map(PATTERNS.map((p) => [p.id, p]));
+
+// ---------- Paths ----------
+// `unlock`: "seen"    → next stage opens once every question here was answered once
+//           "mastery" → …and at least MASTERY of them are right on their latest attempt
+// `decoys`: how many wrong patterns a recognition question offers.
+// `idPrefix` feeds the stable ids — never change it for a shipped path, or
+// existing installs would get duplicate decks on repair.
+export const MASTERY = 0.7;
+
+export const PATHS = [
+  { ...PATTERN_PATH, patterns: PATTERNS, idPrefix: "lcp", deckPrefix: "Pattern", decoys: 3, unlock: "seen", tone: "core" },
+  {
+    key: "lc-advanced",
+    name: "LeetCode Advanced",
+    blurb: "15 harder patterns — deques, Dijkstra, interval & bitmask DP, KMP, segment trees. Five-way recognition questions, and stages unlock only on mastery.",
+    patterns: ADVANCED_PATTERNS,
+    idPrefix: "lca",
+    deckPrefix: "Advanced",
+    decoys: 4,
+    unlock: "mastery",
+    tone: "hard",
+  },
+];
+
+export const pathByKey = new Map(PATHS.map((p) => [p.key, p]));
+export const patternById = new Map(PATHS.flatMap((path) => path.patterns.map((p) => [p.id, p])));
+// Which path a built-in deck (by its builtinKey = pattern id) belongs to.
+export const pathOfPattern = new Map(PATHS.flatMap((path) => path.patterns.map((p) => [p.id, path])));
+
+// Whether a stage counts as finished under its path's unlock rule. `deck` is a
+// listDecks() row (studiedFraction, mastery).
+export function isStageDone(deck, unlock = "seen") {
+  if (!deck || deck.studiedFraction < 0.999) return false;
+  return unlock !== "mastery" || (deck.mastery ?? 0) >= MASTERY;
+}
 
 const RECOGNITION_PROMPTS = [
   "Which pattern cracks this problem?",
@@ -1305,11 +1340,11 @@ function shuffledChoices(choices, key) {
 }
 
 // Builds one pattern's deck in the unified import schema (plus a `guide` the
-// app shows on the deck screen). `index` is the pattern's position in the path.
-export function buildPatternDeck(pattern, index) {
+// app shows on the deck screen). `index` is the pattern's position in its path.
+export function buildPatternDeck(pattern, index, path = PATHS[0]) {
   const nn = String(index + 1).padStart(2, "0");
   return {
-    deck_name: `Pattern ${nn} · ${pattern.name}`,
+    deck_name: `${path.deckPrefix} ${nn} · ${pattern.name}`,
     source_type: "leetcode",
     guide: {
       patternId: pattern.id,
@@ -1319,9 +1354,9 @@ export function buildPatternDeck(pattern, index) {
       complexity: pattern.complexity,
     },
     items: pattern.problems.map((pr, j) => {
-      const base = `lcp:${pattern.id}:${j}`;
-      // Rotate through the look-alikes so each problem has a different trio.
-      const decoys = [0, 1, 2].map((k) => pattern.confusers[(j + k) % pattern.confusers.length]);
+      const base = `${path.idPrefix}:${pattern.id}:${j}`;
+      // Rotate through the look-alikes so problems get different decoy sets.
+      const decoys = Array.from({ length: path.decoys }, (_, k) => pattern.confusers[(j + k) % pattern.confusers.length]);
       const recog = shuffledChoices(
         [pattern.name, ...decoys.map((id) => patternById.get(id).name)],
         `${base}:recognize`

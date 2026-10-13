@@ -9,10 +9,11 @@ import {
   loadSampleDeck,
   exportDeckJSON,
   countFlags,
-  getPatternPath,
+  getPatternPaths,
 } from "../store.js";
 import { guideBlock } from "./guide.js";
-import { installAndOpenPath, openRoadmapDetail } from "./roadmaps.js";
+import { installAndOpenPath, openRoadmapDetail, pathClass } from "./roadmaps.js";
+import { PATHS, pathOfPattern } from "../patterns.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
@@ -90,49 +91,55 @@ export async function renderDecks() {
     )
   );
 
-  // The 20 built-in pattern decks collapse into one card so they don't bury
-  // your own decks; each is still reachable from the path.
+  // Built-in pattern decks collapse into one card per path so they don't bury
+  // your own decks; each deck is still reachable from its path.
   const builtin = decks.filter((d) => d.builtinKey);
   const own = decks.filter((d) => !d.builtinKey);
   if (builtin.length > 0) {
-    const path = await getPatternPath();
-    const seen = builtin.reduce((s, d) => s + d.studiedFraction * d.questionCount, 0);
-    const total = builtin.reduce((s, d) => s + d.questionCount, 0);
-    const due = builtin.reduce((s, d) => s + d.dueCount, 0);
-    const prog = h("div", { class: "progress" }, h("i", {}));
-    prog.firstChild.style.width = `${total ? (seen / total) * 100 : 0}%`;
+    const roadmaps = await getPatternPaths();
     wrap.appendChild(h("div", { class: "section-header" }, "Built-in"));
-    wrap.appendChild(
-      h(
-        "div",
-        {
-          class: "card deck builtin-path",
-          role: "button",
-          tabindex: "0",
-          onclick: () => (path ? openRoadmapDetail(path.id) : installAndOpenPath()),
-        },
+    for (const path of PATHS) {
+      const group = builtin.filter((d) => pathOfPattern.get(d.builtinKey) === path);
+      if (group.length === 0) continue;
+      const roadmap = roadmaps.find((r) => r.builtin === path.key);
+      const seen = group.reduce((s, d) => s + d.studiedFraction * d.questionCount, 0);
+      const total = group.reduce((s, d) => s + d.questionCount, 0);
+      const due = group.reduce((s, d) => s + d.dueCount, 0);
+      const pctSeen = Math.round(total ? (seen / total) * 100 : 0);
+      const prog = h("div", { class: "progress" }, h("i", {}));
+      prog.firstChild.style.width = `${pctSeen}%`;
+      wrap.appendChild(
         h(
           "div",
-          { class: "row", style: "align-items:flex-start" },
-          h("span", { class: "icon-chip c-purple", html: ICONS.code }),
+          {
+            class: `card deck${pathClass(path.tone)}`,
+            role: "button",
+            tabindex: "0",
+            onclick: () => (roadmap ? openRoadmapDetail(roadmap.id) : installAndOpenPath(path.key)),
+          },
           h(
             "div",
-            { class: "spacer" },
-            h("h3", {}, "LeetCode Patterns"),
+            { class: "row", style: "align-items:flex-start" },
+            h("span", { class: `icon-chip ${path.tone === "hard" ? "c-red" : "c-purple"}`, html: ICONS.code }),
             h(
               "div",
-              { class: "meta" },
-              h("span", {}, `${builtin.length} pattern decks`),
-              h("span", {}, `${total} questions`),
-              due > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${due} due`) : null
-            )
+              { class: "spacer" },
+              h("h3", {}, path.name),
+              h(
+                "div",
+                { class: "meta" },
+                h("span", {}, `${group.length} pattern decks`),
+                h("span", {}, `${total} questions`),
+                due > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${due} due`) : null
+              )
+            ),
+            h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
           ),
-          h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
-        ),
-        prog,
-        h("div", { class: "small muted", style: "margin-top:6px" }, `${Math.round(total ? (seen / total) * 100 : 0)}% seen`)
-      )
-    );
+          prog,
+          h("div", { class: "small muted", style: "margin-top:6px" }, `${pctSeen}% seen`)
+        )
+      );
+    }
   }
 
   if (own.length > 0) wrap.appendChild(h("div", { class: "section-header" }, "Your decks"));

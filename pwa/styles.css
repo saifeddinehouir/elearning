@@ -798,3 +798,97 @@ pre.code {
   .tabbar button { flex: 0 1 120px; }
   .overlay { max-width: 760px; margin: 0 auto; }
 }
+
+/* ---------- View transitions ---------- */
+#view.view-enter > * { animation: view-in 0.32s var(--ease) both; }
+#view.view-enter > *:nth-child(2) { animation-delay: 0.03s; }
+#view.view-enter > *:nth-child(3) { animation-delay: 0.06s; }
+#view.view-enter > *:nth-child(n + 4) { animation-delay: 0.09s; }
+@keyframes view-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* Active tab gets a small indicator bar along the top edge. */
+.tabbar button { position: relative; }
+.tabbar button::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  width: 26px; height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform 0.22s var(--ease);
+}
+.tabbar button.active::before { transform: translateX(-50%) scaleX(1); }
+
+/* ---------- Session: segmented progress & question entrance ---------- */
+.segbar { display: flex; gap: 3px; margin: 0 16px 6px; height: 6px; }
+.segbar > i {
+  flex: 1; border-radius: 999px;
+  background: var(--surface-3);
+  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.segbar > i.ok { background: var(--green); }
+.segbar > i.bad { background: var(--red); }
+.segbar > i.current { background: color-mix(in srgb, var(--accent) 55%, var(--surface-3)); transform: scaleY(1.35); }
+.segbar > i.current.ok { background: var(--green); }
+.segbar > i.current.bad { background: var(--red); }
+.q-card.q-enter { animation: q-in 0.28s var(--ease); }
+.q-card.q-enter + .choices { animation: q-in 0.32s var(--ease); }
+@keyframes q-in { from { opacity: 0; transform: translateX(14px); } }
+
+/* ---------- Pattern mastery grid ---------- */
+.mastery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.mtile {
+  --mc: var(--text-faint);
+  position: relative;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 10px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--mc) 15%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--mc) 35%, transparent);
+  min-height: 74px;
+}
+.mtile.untried { background: var(--surface-2); border-style: dashed; border-color: var(--border); opacity: 0.6; }
+.mtile-num { font-size: 0.62rem; font-weight: 800; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.mtile-name { font-size: 0.74rem; font-weight: 600; line-height: 1.25; flex: 1; }
+.mtile-v { font-size: 0.95rem; font-weight: 800; color: var(--mc); font-variant-numeric: tabular-nums; }
+.mtile.untried .mtile-v { color: var(--text-faint); }
+.legend { flex-wrap: wrap; gap: 10px; }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ---------- Heatmap labels ---------- */
+.heatmap .mo {
+  height: 14px; font-size: 0.62rem; color: var(--text-faint); font-weight: 600;
+  white-space: nowrap; overflow: visible; width: 13px;
+}
+.heatmap .wk.labels { margin-right: 2px; }
+.heatmap .dl { height: 13px; font-size: 0.6rem; line-height: 13px; color: var(--text-faint); width: 24px; }
+
+/* ---------- Advanced ("hard") path theme ---------- */
+.card.builtin-path.hard, .card.promo.hard {
+  background:
+    radial-gradient(110% 130% at 100% 0%, color-mix(in srgb, var(--red) 18%, transparent), transparent 60%),
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--orange) 10%, transparent), transparent 60%),
+    var(--surface);
+  border-color: color-mix(in srgb, var(--red) 30%, var(--border));
+}
+.card.builtin-path.hard .stage-num { color: color-mix(in srgb, var(--red) 60%, transparent); }
+.btn.hard-btn {
+  background: linear-gradient(135deg, var(--orange), var(--red));
+  color: #fff; border-color: transparent; font-weight: 700;
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--red) 70%, transparent);
+}
+.card.cheat.hard .cheat-num { background: color-mix(in srgb, var(--red) 16%, var(--surface-2)); color: var(--red); }
+.mastery { font-weight: 600; color: var(--orange); }
+.mastery.ok { color: var(--green); }
+
+/* ---------- Pointer devices: hover affordances ---------- */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { filter: brightness(1.07); }
+  .choice:hover:not(:disabled):not(.selected) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .card.deck:hover, .card.option:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); transform: translateY(-1px); }
+  .card.deck { transition: transform 0.15s var(--ease), border-color 0.15s var(--ease); }
+  .roadmap-node:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+  .tabbar button:hover:not(.active) { color: var(--text-dim); }
+  .wd:hover .wd-dot { transform: scale(1.08); }
+}

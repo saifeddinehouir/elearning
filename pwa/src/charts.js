@@ -109,9 +109,30 @@ export function heatmap(byDayMap, { weeks = 20, maxAnswered = 1, onSelect } = {}
   const container = document.createElement("div");
   container.className = "heatmap";
 
+  // Weekday labels (Mon / Wed / Fri, like GitHub) in a leading column.
+  const labels = document.createElement("div");
+  labels.className = "wk labels";
+  labels.innerHTML = `<span class="mo"></span>` + ["", "Mon", "", "Wed", "", "Fri", ""].map((l) => `<span class="dl">${l}</span>`).join("");
+  container.appendChild(labels);
+
+  let prevMonth = null;
+  let lastLabel = null; // { el, w }
   for (let w = 0; w < weeks; w++) {
     const col = document.createElement("div");
     col.className = "wk";
+    // Month label over the first column of each month. A label needs about
+    // three columns of room, so a partial month squeezed in before the next
+    // one loses its label rather than overlapping it.
+    const month = new Date(addDays(firstSunday, w * 7)).getMonth();
+    const mo = document.createElement("span");
+    mo.className = "mo";
+    if (month !== prevMonth && w < weeks - 1) {
+      if (lastLabel && w - lastLabel.w < 3) lastLabel.el.textContent = "";
+      mo.textContent = new Date(addDays(firstSunday, w * 7)).toLocaleDateString(undefined, { month: "short" });
+      lastLabel = { el: mo, w };
+    }
+    prevMonth = month;
+    col.appendChild(mo);
     for (let d = 0; d < 7; d++) {
       const dayMs = addDays(firstSunday, w * 7 + d).getTime();
       const cell = document.createElement("div");

@@ -57,7 +57,8 @@ pwa/
     stats.js            attempt aggregations (pure)       │
     schema.js           JSON schema parse + validate      │
     random.js           seeded RNG, stable UUIDs          │
-    patterns.js         built-in LeetCode pattern path    │
+    patterns.js         built-in paths + core 20 patterns │
+    patterns-advanced.js  the 15 advanced patterns        │
     challenge.js        daily challenge picker + streak  ─┘
     db.js               IndexedDB promise wrapper
     store.js            data layer: assembles logic inputs, does all mutations
@@ -124,6 +125,24 @@ no JSON generation needed. Content lives in [`src/patterns.js`](src/patterns.js)
   own from the path.
 - Ids and answer positions are deterministic, so reinstalling (after deleting a
   deck) never duplicates anything.
+
+### LeetCode Advanced (the hard path)
+
+A second built-in path for after the basics: 15 harder patterns (monotonic
+deque, binary search on the answer, Dijkstra, BFS over states, MST, LIS, interval
+DP, bitmask DP, tree DP, state-machine DP, KMP / rolling hash, Fenwick / segment
+trees, sweep line, greedy with regret, divide & conquer counting). That's 45
+problems and 90 questions, with no easy problems. It's harder in two ways:
+
+- **5-way recognition**: four decoys instead of three, picked so none of them is
+  also a valid way to solve the problem.
+- **Mastery unlocks**: a stage opens only when every question in the previous
+  stage has been seen **and** ≥ 70% are right on their latest attempt (from
+  SM-2: `repetitions > 0` ⇔ the last answer was correct).
+
+Content: [`src/patterns-advanced.js`](src/patterns-advanced.js). Paths are
+declared in `PATHS` in [`src/patterns.js`](src/patterns.js). Never change a
+shipped path's `idPrefix`, because it seeds the stable question ids.
 
 ## Daily challenge
 

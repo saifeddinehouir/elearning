@@ -1,5 +1,6 @@
 import { h, toast, ICONS } from "../dom.js";
-import { getDailyPool, getAllStudyDays, getSettings, listDecks, getPatternPath, loadSampleDeck } from "../store.js";
+import { getDailyPool, getAllStudyDays, getSettings, listDecks, getPatternPaths, loadSampleDeck } from "../store.js";
+import { PATHS, pathByKey, isStageDone, MASTERY } from "../patterns.js";
 import { composeSession } from "../session.js";
 import { currentStreak } from "../streak.js";
 import { ring } from "../charts.js";
@@ -7,16 +8,16 @@ import { startSession } from "./session.js";
 import { openImport } from "./import.js";
 import { openSettings } from "./settings.js";
 import { challengeCard } from "./challenge.js";
-import { installAndOpenPath, openRoadmapDetail, pathPromoCard } from "./roadmaps.js";
+import { installAndOpenPath, openRoadmapDetail, pathPromoCard, pathClass } from "./roadmaps.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
 
 export async function renderDaily() {
-  const [pool, studyDays, decks, patternPath] = await Promise.all([
+  const [pool, studyDays, decks, installedPaths] = await Promise.all([
     getDailyPool(),
     getAllStudyDays(),
     listDecks(),
-    getPatternPath(),
+    getPatternPaths(),
   ]);
   const settings = getSettings();
   const config = { size: settings.dailyGoal, newLimitRatio: settings.newLimitRatio };
@@ -48,12 +49,14 @@ export async function renderDaily() {
 
   wrap.appendChild(await challengeCard({ onNeedContent: installAndOpenPath }));
 
-  if (patternPath) {
-    const next = upNextCard(patternPath, decks);
-    if (next) wrap.appendChild(next);
-  } else {
-    wrap.appendChild(pathPromoCard());
+  // One "up next" per installed path (in path order), then a pitch for the
+  // first path you haven't started.
+  for (const path of PATHS) {
+    const roadmap = installedPaths.find((r) => r.builtin === path.key);
+    if (roadmap) wrap.appendChild(upNextCard(roadmap, decks));
   }
+  const notYet = PATHS.find((p) => !installedPaths.some((r) => r.builtin === p.key));
+  if (notYet) wrap.appendChild(pathPromoCard(notYet, { compact: installedPaths.length > 0 }));
   return wrap;
 }
 
@@ -137,18 +140,18 @@ function pill(color, n, label) {
   );
 }
 
-// "Up next" for the built-in pattern path: the first stage not finished yet.
+// "Up next" for a built-in pattern path: the first stage not finished yet.
 function upNextCard(path, decks) {
+  const def = pathByKey.get(path.builtin);
+  const rule = def?.unlock || "seen";
+  const cls = `card${pathClass(def?.tone || "core")}`;
   const deckById = new Map(decks.map((d) => [d.id, d]));
-  const idx = path.nodes.findIndex((n) => {
-    const d = deckById.get(n.deckId);
-    return !(d && d.studiedFraction >= 0.999);
-  });
+  const idx = path.nodes.findIndex((n) => !isStageDone(deckById.get(n.deckId), rule));
   const total = path.nodes.length;
   if (idx === -1) {
     return h(
       "div",
-      { class: "card builtin-path", role: "button", tabindex: "0", onclick: () => openRoadmapDetail(path.id) },
+      { class: cls, role: "button", tabindex: "0", onclick: () => openRoadmapDetail(path.id) },
       h("div", { class: "kicker" }, path.name),
       h("div", { class: "promo-title" }, "🎉 Every pattern studied"),
       h("p", { class: "small muted", style: "margin-top:4px" }, "Reviews keep coming back on schedule. Skim the cheat sheet before an interview.")
@@ -159,30 +162,33 @@ function upNextCard(path, decks) {
   const pctDone = deck ? Math.round(deck.studiedFraction * 100) : 0;
   const prog = h("div", { class: "progress", style: "margin-top:10px" }, h("i", {}));
   prog.firstChild.style.width = `${pctDone}%`;
+  const status = [`${pctDone}% seen`];
+  if (deck && rule === "mastery") status.push(`${Math.round(deck.mastery * 100)}% mastery (need ${Math.round(MASTERY * 100)}%)`);
+  if (deck) status.push(`${deck.questionCount} questions`);
 
   return h(
     "div",
-    { class: "card builtin-path" },
+    { class: cls },
     h(
       "div",
       { class: "row", style: "align-items:flex-start" },
       h(
         "div",
         { class: "spacer" },
-        h("div", { class: "kicker" }, `Up next · stage ${idx + 1} of ${total}`),
+        h("div", { class: "kicker" }, `${path.name} · stage ${idx + 1} of ${total}`),
         h("div", { class: "promo-title" }, node.title),
         h("div", { class: "small muted", style: "margin-top:2px" }, node.description)
       ),
       h("span", { class: "stage-num" }, String(idx + 1).padStart(2, "0"))
     ),
     prog,
-    h("div", { class: "small muted", style: "margin-top:6px" }, `${pctDone}% seen${deck ? ` · ${deck.questionCount} questions` : ""}`),
+    h("div", { class: "small muted", style: "margin-top:6px" }, status.join(" · ")),
     h(
       "div",
       { class: "row", style: "gap:10px;margin-top:12px" },
       deck ? h("button", { class: "btn block", onclick: () => openDeckDetail(deck.id) }, "Open stage") : null,
       h("button", { class: "btn block", onclick: () => openRoadmapDetail(path.id) }, "Full path"),
-      h("button", { class: "btn icon-btn", "aria-label": "Pattern cheat sheet", onclick: openCheatSheet, html: ICONS.list })
+      h("button", { class: "btn icon-btn", "aria-label": "Pattern cheat sheet", onclick: () => openCheatSheet(path.builtin), html: ICONS.list })
     )
   );
 }

@@ -51,7 +51,9 @@ export function runSession(queue, opts = {}) {
     const overlay = h("div", { class: "overlay session" });
 
     const head = h("div", { class: "o-head" });
-    const bar = h("div", { class: "progress session-progress" }, h("i", {}));
+    // One segment per question: green / red once answered, highlighted when current.
+    const bar = h("div", { class: "segbar" }, ...queue.map(() => h("i", {})));
+    let paintedIndex = -1;
     const timeBar = h("div", { class: "timebar", hidden: true }, h("i", {}));
     const body = h("div", { class: "o-body" });
     const foot = h("div", { class: "o-foot" });
@@ -123,7 +125,11 @@ export function runSession(queue, opts = {}) {
 
     function paintProgress() {
       counter.textContent = `${state.viewIndex + 1} of ${state.queue.length}`;
-      bar.firstChild.style.width = `${(answeredCount() / state.queue.length) * 100}%`;
+      [...bar.children].forEach((seg, i) => {
+        const rec = state.history[i];
+        seg.className = rec ? (rec.feedback.correct ? "ok" : "bad") : "";
+        if (i === state.viewIndex && !state.done) seg.classList.add("current");
+      });
       backBtn.disabled = state.viewIndex === 0;
       combo.hidden = !opts.showCombo || state.combo < 2;
       combo.textContent = `🔥 ${state.combo}`;
@@ -231,7 +237,9 @@ export function runSession(queue, opts = {}) {
       const q = state.queue[state.viewIndex];
       clear(body);
 
-      const card = h("div", { class: "q-card" });
+      // Slide in only when the question changes, not when a choice is picked.
+      const card = h("div", { class: paintedIndex === state.viewIndex ? "q-card" : "q-card q-enter" });
+      paintedIndex = state.viewIndex;
       card.appendChild(
         h(
           "div",
@@ -348,7 +356,7 @@ export function runSession(queue, opts = {}) {
     function renderSummary(unlocked = [], extra = null) {
       state.done = true;
       stopTimer();
-      bar.firstChild.style.width = "100%";
+      paintProgress();
       counter.textContent = "Complete";
       endBtn.textContent = "Close";
       backBtn.style.display = "none";

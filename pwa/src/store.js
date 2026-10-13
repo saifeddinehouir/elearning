@@ -13,7 +13,7 @@ import {
 } from "./db.js";
 import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./sm2.js";
 import { uuid, UUID_RE, startOfDay } from "./format.js";
-import { PATTERNS, PATTERN_PATH, buildPatternDeck } from "./patterns.js";
+import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -68,6 +68,9 @@ export async function listDecks() {
       const dItems = items.filter((i) => i.deckId === d.id);
       const dQ = questions.filter((q) => q.deckId === d.id);
       const studied = dQ.filter((q) => (reviewByQ.get(q.id)?.totalReviews || 0) > 0).length;
+      // SM-2 resets repetitions to 0 on a miss, so repetitions > 0 ⇔ the
+      // latest answer to that question was right.
+      const mastered = dQ.filter((q) => (reviewByQ.get(q.id)?.repetitions || 0) > 0).length;
       const due = dQ.filter((q) => {
         const r = reviewByQ.get(q.id);
         return r && r.totalReviews > 0 && r.dueDate < endOfToday;
@@ -77,6 +80,7 @@ export async function listDecks() {
         itemCount: dItems.length,
         questionCount: dQ.length,
         studiedFraction: dQ.length ? studied / dQ.length : 0,
+        mastery: dQ.length ? mastered / dQ.length : 0,
         dueCount: due,
       };
     })
@@ -500,26 +504,34 @@ export async function moveRoadmapNode(roadmapId, nodeId, direction) {
   emit();
 }
 
-// ---------- Built-in LeetCode Patterns path ----------
-// One deck per pattern plus a roadmap marked `builtin`, whose nodes unlock in
-// order: a stage opens (and joins the daily mix) once the stage before it has
-// every question studied at least once.
+// ---------- Built-in pattern paths ----------
+// Each path (see PATHS in patterns.js) is one deck per pattern plus a roadmap
+// whose `builtin` is the path key. Nodes unlock in order: a stage opens (and
+// joins the daily mix) once the stage before it is done under the path's
+// unlock rule — every question seen, or seen AND mostly right ("mastery").
 
-export async function getPatternPath() {
+export async function getPatternPath(key = PATTERN_PATH.key) {
   const roadmaps = await dbGetAll(STORES.roadmaps);
-  return roadmaps.find((r) => r.builtin === PATTERN_PATH.key) || null;
+  return roadmaps.find((r) => r.builtin === key) || null;
+}
+
+export async function getPatternPaths() {
+  const roadmaps = await dbGetAll(STORES.roadmaps);
+  return roadmaps.filter((r) => r.builtin && pathByKey.has(r.builtin));
 }
 
 // Idempotent: re-running it recreates any pattern deck that was deleted and
 // re-links it, without duplicating decks that still exist or touching progress.
-export async function installPatternPath() {
-  const [decks, existing] = await Promise.all([dbGetAll(STORES.decks), getPatternPath()]);
+export async function installPatternPath(key = PATTERN_PATH.key) {
+  const path = pathByKey.get(key);
+  if (!path) throw new Error(`Unknown path ${key}`);
+  const [decks, existing] = await Promise.all([dbGetAll(STORES.decks), getPatternPath(key)]);
   const deckByKey = new Map(decks.filter((d) => d.builtinKey).map((d) => [d.builtinKey, d]));
 
   const deckFor = async (pattern, i) => {
     const have = deckByKey.get(pattern.id);
     if (have) return have;
-    const { deck } = await importDeck(buildPatternDeck(pattern, i), "copy", {
+    const { deck } = await importDeck(buildPatternDeck(pattern, i, path), "copy", {
       builtinKey: pattern.id,
       includeInMix: i === 0,
       silent: true,
@@ -532,26 +544,26 @@ export async function installPatternPath() {
     const deckIds = new Set(decks.map((d) => d.id));
     for (const node of roadmap.nodes) {
       if (!node.patternId || (node.deckId && deckIds.has(node.deckId))) continue;
-      const idx = PATTERNS.findIndex((p) => p.id === node.patternId);
-      if (idx >= 0) node.deckId = (await deckFor(PATTERNS[idx], idx)).id;
+      const idx = path.patterns.findIndex((p) => p.id === node.patternId);
+      if (idx >= 0) node.deckId = (await deckFor(path.patterns[idx], idx)).id;
     }
   } else {
     const nodes = [];
-    for (const [i, p] of PATTERNS.entries()) {
+    for (const [i, p] of path.patterns.entries()) {
       const deck = await deckFor(p, i);
       nodes.push({ id: uuid(), title: p.name, description: p.tagline, deckId: deck.id, patternId: p.id, unlocked: i === 0 });
     }
-    roadmap = { id: uuid(), name: PATTERN_PATH.name, builtin: PATTERN_PATH.key, createdAt: Date.now(), nodes };
+    roadmap = { id: uuid(), name: path.name, builtin: path.key, createdAt: Date.now(), nodes };
   }
   await dbPut(STORES.roadmaps, roadmap);
   emit();
   return roadmap;
 }
 
-// Unlocks every built-in path stage whose previous stage is fully studied.
-// Returns the titles that were newly unlocked. Never re-locks anything, and
-// only ever turns "include in daily mix" ON — a manual opt-out made after
-// unlocking is left alone.
+// Unlocks every built-in path stage whose previous stage is done. Returns the
+// titles that were newly unlocked. Never re-locks anything, and only ever
+// turns "include in daily mix" ON — a manual opt-out made after unlocking is
+// left alone.
 export async function syncPathUnlocks() {
   const roadmaps = (await dbGetAll(STORES.roadmaps)).filter((r) => r.builtin);
   if (roadmaps.length === 0) return [];
@@ -559,6 +571,7 @@ export async function syncPathUnlocks() {
   const byId = new Map(decks.map((d) => [d.id, d]));
   const unlocked = [];
   for (const r of roadmaps) {
+    const rule = pathByKey.get(r.builtin)?.unlock || "seen";
     let changed = false;
     let prevDone = true;
     for (const node of r.nodes) {
@@ -572,7 +585,7 @@ export async function syncPathUnlocks() {
           if (raw) await dbPut(STORES.decks, { ...raw, includeInMix: true });
         }
       }
-      prevDone = !!deck && deck.studiedFraction >= 0.999;
+      prevDone = isStageDone(deck, rule);
     }
     if (changed) await dbPut(STORES.roadmaps, r);
   }

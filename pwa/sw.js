@@ -1,6 +1,6 @@
 // DailyQCM service worker — offline app shell + notification click handling.
 // Bump CACHE whenever shell files change.
-const CACHE = "dailyqcm-v5";
+const CACHE = "dailyqcm-v6";
 
 const SHELL = [
   ".",
@@ -28,6 +28,7 @@ const SHELL = [
   "src/prompt-template.js",
   "src/random.js",
   "src/patterns.js",
+  "src/patterns-advanced.js",
   "src/challenge.js",
   "samples/course.json",
   "samples/leetcode.json",
