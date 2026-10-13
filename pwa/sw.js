@@ -1,6 +1,6 @@
 // DailyQCM service worker — offline app shell + notification click handling.
 // Bump CACHE whenever shell files change.
-const CACHE = "dailyqcm-v7";
+const CACHE = "dailyqcm-v8";
 
 const SHELL = [
   ".",
@@ -32,8 +32,22 @@ const SHELL = [
   "src/patterns.js",
   "src/patterns-advanced.js",
   "src/challenge.js",
+  "src/library.js",
   "samples/course.json",
   "samples/leetcode.json",
+  "library/java-spring/index.json",
+  "library/java-spring/java-collections-generics.json",
+  "library/java-spring/java-8-features.json",
+  "library/java-spring/java-concurrency-multithreading.json",
+  "library/java-spring/java-i-o-nio.json",
+  "library/java-spring/java-design-patterns-gof.json",
+  "library/java-spring/spring-core-aop.json",
+  "library/java-spring/spring-boot-essentials.json",
+  "library/java-spring/spring-web-mvc-rest-security.json",
+  "library/java-spring/spring-data-jpa-hibernate.json",
+  "library/java-spring/relational-nosql-databases.json",
+  "library/java-spring/testing-junit-mockito.json",
+  "library/java-spring/system-design.json",
   "src/views/import.js",
   "src/views/daily.js",
   "src/views/session.js",

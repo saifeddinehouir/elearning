@@ -180,6 +180,25 @@ timing. The one case that still needs a nudge is when `sw.js` itself changes; fo
 that, `src/updates.js` shows an in-app **"A new version is ready — Reload"** banner
 as soon as it detects one — tap it and it activates immediately.
 
+## Built-in Java & Spring Boot library
+
+**Today → Add the Java & Spring Boot decks** (or Roadmaps / Decks) installs 12
+interview decks, 521 questions, all unlocked and in the daily mix:
+Collections & Generics, Java 8, Concurrency, I/O & NIO, Design Patterns (GoF),
+Spring Core & AOP, Spring Boot Essentials, Web MVC / REST / Security,
+Data / JPA / Hibernate, Relational & NoSQL, JUnit & Mockito, System Design.
+The JSON lives in [`library/java-spring/`](library/java-spring/) and is
+listed in study order by its `index.json`. Installing again repairs missing
+decks without duplicating, and a deck you imported yourself under the same
+name is adopted with its progress.
+
+## Backups — read this on iPhone
+
+A Home Screen web app on iOS has **its own storage, separate from Safari**.
+Removing the app from the Home Screen deletes its decks and progress. Use
+**Settings → Back up everything** (share sheet → Save to Files) before removing
+or reinstalling, and **Restore from a backup** afterwards or on a new phone.
+
 ## Data & privacy
 
 Everything is stored locally in the browser (IndexedDB + `localStorage`). Nothing

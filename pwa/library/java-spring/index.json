@@ -1,0 +1,124 @@
+[
+ {
+  "id": "java-collections-generics",
+  "name": "Java Collections & Generics",
+  "items": 37,
+  "questions": 50,
+  "topics": [
+   "Collections",
+   "Generics"
+  ]
+ },
+ {
+  "id": "java-8-features",
+  "name": "Java 8 Features",
+  "items": 36,
+  "questions": 50,
+  "topics": [
+   "Java 8"
+  ]
+ },
+ {
+  "id": "java-concurrency-multithreading",
+  "name": "Java Concurrency & Multithreading",
+  "items": 39,
+  "questions": 51,
+  "topics": [
+   "Concurrency"
+  ]
+ },
+ {
+  "id": "java-i-o-nio",
+  "name": "Java I/O & NIO",
+  "items": 36,
+  "questions": 46,
+  "topics": [
+   "IO"
+  ]
+ },
+ {
+  "id": "java-design-patterns-gof",
+  "name": "Java Design Patterns (GoF)",
+  "items": 37,
+  "questions": 46,
+  "topics": [
+   "Design Patterns"
+  ]
+ },
+ {
+  "id": "spring-core-aop",
+  "name": "Spring Core & AOP",
+  "items": 41,
+  "questions": 47,
+  "topics": [
+   "Spring Core"
+  ]
+ },
+ {
+  "id": "spring-boot-essentials",
+  "name": "Spring Boot Essentials",
+  "items": 18,
+  "questions": 21,
+  "topics": [
+   "Actuator",
+   "Auto-configuration",
+   "Configuration",
+   "Packaging",
+   "Testing",
+   "Web"
+  ]
+ },
+ {
+  "id": "spring-web-mvc-rest-security",
+  "name": "Spring Web MVC, REST & Security",
+  "items": 40,
+  "questions": 46,
+  "topics": [
+   "Spring Security",
+   "Spring Web"
+  ]
+ },
+ {
+  "id": "spring-data-jpa-hibernate",
+  "name": "Spring Data, JPA & Hibernate",
+  "items": 40,
+  "questions": 47,
+  "topics": [
+   "Spring Data"
+  ]
+ },
+ {
+  "id": "relational-nosql-databases",
+  "name": "Relational & NoSQL Databases",
+  "items": 39,
+  "questions": 45,
+  "topics": [
+   "Databases"
+  ]
+ },
+ {
+  "id": "testing-junit-mockito",
+  "name": "Testing: JUnit & Mockito",
+  "items": 40,
+  "questions": 46,
+  "topics": [
+   "Testing"
+  ]
+ },
+ {
+  "id": "system-design",
+  "name": "System Design",
+  "items": 23,
+  "questions": 26,
+  "topics": [
+   "API design",
+   "Caching",
+   "Databases",
+   "Distributed systems",
+   "Estimation",
+   "Messaging",
+   "Reliability",
+   "Scaling"
+  ]
+ }
+]

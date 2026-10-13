@@ -1,5 +1,5 @@
 import { h, clear, closeOverlay, ICONS } from "./dom.js";
-import { onChange, getSettings } from "./store.js";
+import { onChange, getSettings, requestPersistentStorage } from "./store.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 
@@ -139,3 +139,4 @@ registerServiceWorker().then(() => {
 });
 applyTheme();
 render();
+requestPersistentStorage();

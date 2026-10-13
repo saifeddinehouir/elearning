@@ -8,7 +8,8 @@ import { startSession } from "./session.js";
 import { openImport } from "./import.js";
 import { openSettings } from "./settings.js";
 import { challengeCard } from "./challenge.js";
-import { installAndOpenPath, openRoadmapDetail, pathPromoCard, pathClass } from "./roadmaps.js";
+import { installAndOpenPath, installAndOpenLibrary, openRoadmapDetail, pathPromoCard, libraryPromoCard, pathClass } from "./roadmaps.js";
+import { LIBRARIES } from "../library.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
 
@@ -51,9 +52,12 @@ export async function renderDaily() {
 
   // One "up next" per installed path (in path order), then a pitch for the
   // first path you haven't started.
-  for (const path of PATHS) {
+  for (const path of [...LIBRARIES, ...PATHS]) {
     const roadmap = installedPaths.find((r) => r.builtin === path.key);
     if (roadmap) wrap.appendChild(upNextCard(roadmap, decks));
+  }
+  for (const lib of LIBRARIES) {
+    if (!installedPaths.some((r) => r.builtin === lib.key)) wrap.appendChild(libraryPromoCard(lib));
   }
   const notYet = PATHS.find((p) => !installedPaths.some((r) => r.builtin === p.key));
   if (notYet) wrap.appendChild(pathPromoCard(notYet, { compact: installedPaths.length > 0 }));
@@ -173,7 +177,7 @@ function upNextCard(path, decks) {
       { class: "row", style: "gap:10px;margin-top:12px" },
       deck ? h("button", { class: "btn block", onclick: () => openDeckDetail(deck.id) }, "Open stage") : null,
       h("button", { class: "btn block", onclick: () => openRoadmapDetail(path.id) }, "Full path"),
-      h("button", { class: "btn icon-btn", "aria-label": "Pattern cheat sheet", onclick: () => openCheatSheet(path.builtin), html: ICONS.list })
+      def ? h("button", { class: "btn icon-btn", "aria-label": "Pattern cheat sheet", onclick: () => openCheatSheet(path.builtin), html: ICONS.list }) : null
     )
   );
 }
@@ -185,13 +189,27 @@ function welcome() {
     h(
       "div",
       { class: "card hero welcome" },
-      h("div", { class: "kicker" }, "Spaced repetition · LeetCode patterns"),
+      h("div", { class: "kicker" }, "Spaced repetition · Java, Spring & LeetCode"),
       h("div", { class: "promo-title" }, "Learn it once. Remember it for good."),
       h(
         "p",
         { class: "muted", style: "margin:10px 0 0;max-width:40ch" },
         "Short daily sessions, scheduled by spaced repetition, plus a fresh challenge every day."
       )
+    )
+  );
+  box.appendChild(
+    h(
+      "button",
+      { class: "card option", onclick: () => installAndOpenLibrary(LIBRARIES[0].key) },
+      h("span", { class: "icon-chip lg", html: ICONS.coffee }),
+      h(
+        "span",
+        { class: "spacer" },
+        h("span", { class: "option-title" }, `Add the ${LIBRARIES[0].name} decks`),
+        h("span", { class: "option-sub" }, `${LIBRARIES[0].deckCount} interview decks, ${LIBRARIES[0].questionCount} questions: Java, Spring, databases, testing, system design.`)
+      ),
+      h("span", { class: "chevron", html: ICONS.chevron })
     )
   );
   box.appendChild(

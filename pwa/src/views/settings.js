@@ -1,5 +1,6 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getSettings, setSettings } from "../store.js";
+import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt } from "../store.js";
+import { fmtDateFull } from "../format.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
 export function openSettings() {
@@ -152,6 +153,89 @@ export function openSettings() {
           : "Notification permission not requested yet.";
     }
     paintPermission();
+
+    // ---------- Backup ----------
+    body.appendChild(h("div", { class: "section-header" }, "Backup"));
+    const backupList = h("div", { class: "list" });
+    const last = lastBackupAt();
+    backupList.appendChild(
+      h(
+        "button",
+        { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => backUp() },
+        h("span", { class: "icon-chip", html: ICONS.download }),
+        h("span", { class: "label" }, "Back up everything", h("span", { class: "sub" }, last ? `Last backup ${fmtDateFull(last)}` : "Never backed up")),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      )
+    );
+    const restoreInput = h("input", {
+      type: "file",
+      accept: ".json,application/json",
+      style: "display:none",
+      onchange: async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        let obj;
+        try {
+          obj = JSON.parse(await file.text());
+        } catch {
+          toast("That file isn't valid JSON");
+          return;
+        }
+        const problem = checkBackup(obj);
+        if (problem) return toast(problem, 4000);
+        const s = backupSummary(obj);
+        const when = obj.exportedAt ? ` from ${fmtDateFull(obj.exportedAt)}` : "";
+        if (!confirm(`Restore the backup${when}? It has ${s.decks} decks, ${s.questions} questions and ${s.answers} answers, and replaces everything on this device.`)) return;
+        await restoreBackup(obj);
+        toast(`Restored ${s.decks} decks`);
+        close();
+      },
+    });
+    backupList.appendChild(
+      h(
+        "button",
+        { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => restoreInput.click() },
+        h("span", { class: "icon-chip", html: ICONS.upload }),
+        h("span", { class: "label" }, "Restore from a backup", h("span", { class: "sub" }, "Replaces the decks and progress on this device")),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      ),
+      restoreInput
+    );
+    body.appendChild(backupList);
+    body.appendChild(
+      h(
+        "p",
+        { class: "list-footnote" },
+        "On iPhone, removing the app from the Home Screen deletes its data. Back up first, then restore the file after adding the app again or on a new phone."
+      )
+    );
+
+    async function backUp() {
+      const data = await exportBackup();
+      const json = JSON.stringify(data);
+      const name = `dailyqcm-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const file = new File([json], name, { type: "application/json" });
+      // iOS: the share sheet offers "Save to Files". Elsewhere: a download.
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "DailyQCM backup" });
+          toast("Backup ready");
+          return;
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+        }
+      }
+      const url = URL.createObjectURL(file);
+      const a = h("a", { href: url, download: name, style: "display:none" });
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 1000);
+      toast("Backup downloaded");
+    }
 
     // ---------- Reset ----------
     body.appendChild(h("div", { class: "section-header" }, "Data"));

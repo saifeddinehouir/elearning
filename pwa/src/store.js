@@ -10,10 +10,12 @@ import {
   dbPut,
   dbBulkPut,
   dbDelete,
+  tx,
 } from "./db.js";
 import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./sm2.js";
 import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
+import { libraryByKey, libraryKeyFor } from "./library.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -338,6 +340,7 @@ export async function importDeck(dto, resolution, extra = {}) {
     includeInMix: extra.includeInMix ?? true,
     ...(dto.guide && typeof dto.guide === "object" ? { guide: dto.guide } : {}),
     ...(extra.builtinKey ? { builtinKey: extra.builtinKey } : {}),
+    ...(extra.libraryKey ? { libraryKey: extra.libraryKey } : {}),
   };
 
   // Ids from the JSON are kept when they're valid UUIDs AND not already in
@@ -517,7 +520,7 @@ export async function getPatternPath(key = PATTERN_PATH.key) {
 
 export async function getPatternPaths() {
   const roadmaps = await dbGetAll(STORES.roadmaps);
-  return roadmaps.filter((r) => r.builtin && pathByKey.has(r.builtin));
+  return roadmaps.filter((r) => r.builtin && (pathByKey.has(r.builtin) || libraryByKey.has(r.builtin)));
 }
 
 // Idempotent: re-running it recreates any pattern deck that was deleted and
@@ -590,6 +593,137 @@ export async function syncPathUnlocks() {
     if (changed) await dbPut(STORES.roadmaps, r);
   }
   return unlocked;
+}
+
+// ---------- Built-in deck libraries (e.g. Java & Spring Boot) ----------
+
+// Installs (or repairs) a library: every deck in its index.json, in order,
+// plus a roadmap with all stages open. A deck already installed from the
+// library is reused; a deck you imported yourself under the same name is
+// adopted (keeping its progress) instead of duplicated.
+export async function installLibrary(key) {
+  const lib = libraryByKey.get(key);
+  if (!lib) throw new Error(`Unknown library ${key}`);
+  const index = await (await fetch(`${lib.dir}index.json`)).json();
+  const [decks, roadmaps] = await Promise.all([dbGetAll(STORES.decks), dbGetAll(STORES.roadmaps)]);
+  const byLibKey = new Map(decks.filter((d) => d.libraryKey).map((d) => [d.libraryKey, d]));
+  const byName = new Map(decks.filter((d) => !d.libraryKey && !d.builtinKey).map((d) => [d.name, d]));
+
+  const deckIds = [];
+  for (const entry of index) {
+    const lk = libraryKeyFor(lib, entry.id);
+    let deck = byLibKey.get(lk);
+    if (!deck && byName.has(entry.name)) {
+      deck = { ...byName.get(entry.name), libraryKey: lk };
+      await dbPut(STORES.decks, deck);
+    }
+    if (!deck) {
+      const dto = await (await fetch(`${lib.dir}${entry.id}.json`)).json();
+      ({ deck } = await importDeck(dto, "copy", { libraryKey: lk, silent: true }));
+    }
+    deckIds.push({ entry, deck });
+  }
+
+  let roadmap = roadmaps.find((r) => r.builtin === lib.key);
+  if (roadmap) {
+    const existing = new Map(roadmap.nodes.map((n) => [n.libraryDeck, n]));
+    for (const { entry, deck } of deckIds) {
+      const node = existing.get(entry.id);
+      if (node) node.deckId = deck.id;
+    }
+  } else {
+    roadmap = {
+      id: uuid(),
+      name: lib.name,
+      builtin: lib.key,
+      createdAt: Date.now(),
+      nodes: deckIds.map(({ entry, deck }) => ({
+        id: uuid(),
+        title: entry.name,
+        description: entry.topics.slice(0, 4).join(" · "),
+        deckId: deck.id,
+        libraryDeck: entry.id,
+        unlocked: true,
+      })),
+    };
+  }
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+  return roadmap;
+}
+
+// ---------- Backup & restore ----------
+// Everything that lives in IndexedDB plus settings, as one JSON file. On iPhone
+// a Home Screen app's storage is deleted when the app is removed, so this file
+// is the only way to carry progress across a reinstall or to a new phone.
+
+const BACKUP_STORES = [
+  STORES.decks,
+  STORES.items,
+  STORES.questions,
+  STORES.reviewState,
+  STORES.attempts,
+  STORES.studyDays,
+  STORES.flags,
+  STORES.roadmaps,
+  STORES.challenges,
+];
+const BACKUP_KEY = "dailyqcm.lastBackupAt";
+
+export async function exportBackup() {
+  const data = {};
+  for (const s of BACKUP_STORES) data[s] = await dbGetAll(s);
+  try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch {}
+  return { app: "dailyqcm", format: 1, exportedAt: Date.now(), settings: getSettings(), data };
+}
+
+export function lastBackupAt() {
+  try { return Number(localStorage.getItem(BACKUP_KEY)) || null; } catch { return null; }
+}
+
+// Returns null when the object looks like a DailyQCM backup, else a message.
+export function checkBackup(obj) {
+  if (!obj || typeof obj !== "object" || obj.app !== "dailyqcm" || !obj.data) {
+    return "That file isn't a DailyQCM backup. Choose a file made with “Back up everything”.";
+  }
+  if (!Array.isArray(obj.data.decks) || !Array.isArray(obj.data.questions)) return "The backup is missing its decks or questions.";
+  return null;
+}
+
+export const backupSummary = (obj) => ({
+  decks: obj.data.decks?.length || 0,
+  questions: obj.data.questions?.length || 0,
+  answers: obj.data.attempts?.length || 0,
+  days: obj.data.studyDays?.length || 0,
+});
+
+// Replaces everything on this device with the backup, in one transaction.
+export async function restoreBackup(obj) {
+  const problem = checkBackup(obj);
+  if (problem) throw new Error(problem);
+  await tx(BACKUP_STORES, "readwrite", (stores) => {
+    for (const s of BACKUP_STORES) {
+      stores[s].clear();
+      for (const row of obj.data[s] || []) stores[s].put(row);
+    }
+  });
+  if (obj.settings) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj.settings)); } catch {}
+  }
+  emit();
+  return backupSummary(obj);
+}
+
+// Asks the browser not to evict this app's storage under pressure. Harmless
+// where unsupported; it can't stop the user deleting the app itself.
+export async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
 }
 
 // ---------- Daily challenge records ----------

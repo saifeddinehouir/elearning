@@ -14,6 +14,8 @@ import {
 import { guideBlock } from "./guide.js";
 import { installAndOpenPath, openRoadmapDetail, pathClass } from "./roadmaps.js";
 import { PATHS, pathOfPattern } from "../patterns.js";
+import { LIBRARIES, libraryOfDeck } from "../library.js";
+import { installAndOpenLibrary } from "./roadmaps.js";
 import { stageOf } from "../sm2.js";
 import { startSession } from "./session.js";
 import { openImport } from "./import.js";
@@ -94,10 +96,17 @@ export async function renderDecks() {
   // Built-in pattern decks collapse into one card per path so they don't bury
   // your own decks; each deck is still reachable from its path.
   const builtin = decks.filter((d) => d.builtinKey);
-  const own = decks.filter((d) => !d.builtinKey);
-  if (builtin.length > 0) {
+  const libDecks = decks.filter((d) => d.libraryKey);
+  const own = decks.filter((d) => !d.builtinKey && !d.libraryKey);
+  if (builtin.length > 0 || libDecks.length > 0) {
     const roadmaps = await getPatternPaths();
     wrap.appendChild(h("div", { class: "section-header" }, "Built-in"));
+    for (const lib of LIBRARIES) {
+      const group = libDecks.filter((d) => libraryOfDeck(d) === lib);
+      if (group.length === 0) continue;
+      const roadmap = roadmaps.find((r) => r.builtin === lib.key);
+      wrap.appendChild(groupCard(lib.name, group, ICONS.coffee, "", () => (roadmap ? openRoadmapDetail(roadmap.id) : installAndOpenLibrary(lib.key)), "decks"));
+    }
     for (const path of PATHS) {
       const group = builtin.filter((d) => pathOfPattern.get(d.builtinKey) === path);
       if (group.length === 0) continue;
@@ -199,6 +208,40 @@ export async function renderDecks() {
     const r = await loadSampleDeck(kind);
     toast(`Loaded ${r.deck.name}`);
   }
+}
+
+// One summary card standing in for a group of built-in decks.
+function groupCard(name, group, iconSvg, cls, onOpen, noun) {
+  const seen = group.reduce((s, d) => s + d.studiedFraction * d.questionCount, 0);
+  const total = group.reduce((s, d) => s + d.questionCount, 0);
+  const due = group.reduce((s, d) => s + d.dueCount, 0);
+  const pctSeen = Math.round(total ? (seen / total) * 100 : 0);
+  const prog = h("div", { class: "progress" }, h("i", {}));
+  prog.firstChild.style.width = `${pctSeen}%`;
+  return h(
+    "div",
+    { class: `card deck${cls}`, role: "button", tabindex: "0", onclick: onOpen },
+    h(
+      "div",
+      { class: "row", style: "align-items:flex-start" },
+      h("span", { class: "icon-chip", html: iconSvg }),
+      h(
+        "div",
+        { class: "spacer" },
+        h("h3", {}, name),
+        h(
+          "div",
+          { class: "meta" },
+          h("span", {}, `${group.length} ${noun}`),
+          h("span", {}, `${total} questions`),
+          due > 0 ? h("span", { style: "color:var(--accent);font-weight:600" }, `${due} due`) : null
+        )
+      ),
+      h("span", { class: "chevron", html: ICONS.chevron, style: "margin-top:6px" })
+    ),
+    prog,
+    h("div", { class: "small muted", style: "margin-top:6px" }, `${pctSeen}% seen`)
+  );
 }
 
 export async function openDeckDetail(deckId) {

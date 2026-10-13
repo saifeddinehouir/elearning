@@ -18,6 +18,36 @@ import { ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 import { PATHS, PATTERN_PATH, pathByKey, isStageDone, MASTERY } from "../patterns.js";
 import { openCheatSheet } from "./guide.js";
 import { ring } from "../charts.js";
+import { LIBRARIES, libraryByKey } from "../library.js";
+import { installLibrary } from "../store.js";
+
+// Installs (or repairs) a built-in deck library and opens its roadmap.
+export async function installAndOpenLibrary(key) {
+  const lib = libraryByKey.get(typeof key === "string" ? key : LIBRARIES[0].key);
+  toast(`Adding ${lib.name}…`);
+  const roadmap = await installLibrary(lib.key);
+  toast(`${lib.name}: ${lib.deckCount} decks added to your daily mix`);
+  openRoadmapDetail(roadmap.id);
+}
+
+// Promo shown until a library is installed.
+export function libraryPromoCard(lib = LIBRARIES[0]) {
+  return h(
+    "div",
+    { class: "card promo" },
+    h("div", { class: "kicker" }, "Built-in library"),
+    h("div", { class: "promo-title" }, lib.name),
+    h("p", { class: "small muted", style: "margin:4px 0 12px" }, lib.blurb),
+    h(
+      "div",
+      { class: "meta", style: "margin:0 0 12px" },
+      h("span", {}, `${lib.deckCount} decks`),
+      h("span", {}, `${lib.questionCount} questions`),
+      h("span", {}, "all open")
+    ),
+    h("button", { class: "btn primary block", onclick: () => installAndOpenLibrary(lib.key) }, `Add ${lib.name}`)
+  );
+}
 
 // The unlock rule a roadmap's stages are judged by ("seen" for your own roadmaps).
 const ruleOf = (roadmap) => (roadmap?.builtin && pathByKey.get(roadmap.builtin)?.unlock) || "seen";
@@ -79,6 +109,9 @@ export async function renderRoadmaps() {
     )
   );
 
+  for (const lib of LIBRARIES) {
+    if (!roadmaps.some((r) => r.builtin === lib.key)) wrap.appendChild(libraryPromoCard(lib));
+  }
   for (const path of PATHS) {
     if (!roadmaps.some((r) => r.builtin === path.key)) wrap.appendChild(pathPromoCard(path));
   }
@@ -363,8 +396,10 @@ export function openRoadmapDetail(roadmapId) {
       const done = roadmap.nodes.filter((n) => isStageDone(n.deckId ? deckById.get(n.deckId) : null, rule)).length;
       const questions = roadmap.nodes.reduce((s, n) => s + (deckById.get(n.deckId)?.questionCount || 0), 0);
       const frac = total ? done / total : 0;
-      const how =
-        rule === "mastery"
+      const lib = libraryByKey.get(roadmap.builtin);
+      const how = lib
+        ? `All ${roadmap.nodes.length} decks are in your daily mix. This is a suggested order; study them in any order.`
+        : rule === "mastery"
           ? `A stage opens once you've seen every question in the one before it and got at least ${Math.round(MASTERY * 100)}% right on your latest try. Locked stages can still be studied on their own.`
           : "A stage joins your daily mix once you've seen every question in the stage before it. You can still study locked stages on their own.";
       return h(
@@ -383,7 +418,7 @@ export function openRoadmapDetail(roadmapId) {
           h(
             "div",
             { class: "spacer" },
-            h("div", { class: "kicker" }, tone === "hard" ? "Built-in path · challenging" : roadmap.builtin ? "Built-in path" : "Your roadmap"),
+            h("div", { class: "kicker" }, lib ? "Built-in library" : tone === "hard" ? "Built-in path · challenging" : roadmap.builtin ? "Built-in path" : "Your roadmap"),
             h("div", { class: "promo-title" }, roadmap.name),
             h(
               "div",
@@ -394,7 +429,7 @@ export function openRoadmapDetail(roadmapId) {
           )
         ),
         roadmap.builtin ? h("p", { class: "small muted", style: "margin-top:12px" }, how) : null,
-        roadmap.builtin
+        roadmap.builtin && !lib
           ? h("button", { class: "btn block mt", onclick: () => openCheatSheet(roadmap.builtin) }, h("span", { html: ICONS.list }), "Pattern cheat sheet")
           : null
       );
