@@ -105,7 +105,7 @@ export async function renderDecks() {
       const group = libDecks.filter((d) => libraryOfDeck(d) === lib);
       if (group.length === 0) continue;
       const roadmap = roadmaps.find((r) => r.builtin === lib.key);
-      wrap.appendChild(groupCard(lib.name, group, ICONS.coffee, "", () => (roadmap ? openRoadmapDetail(roadmap.id) : installAndOpenLibrary(lib.key)), "decks"));
+      wrap.appendChild(groupCard(lib.name, group, ICONS[lib.icon] || ICONS.book, "", () => (roadmap ? openRoadmapDetail(roadmap.id) : installAndOpenLibrary(lib.key)), "decks"));
     }
     for (const path of PATHS) {
       const group = builtin.filter((d) => pathOfPattern.get(d.builtinKey) === path);

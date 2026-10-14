@@ -1,0 +1,161 @@
+[
+ {
+  "id": "linux-shell",
+  "name": "Linux & Shell Essentials",
+  "items": 19,
+  "questions": 20,
+  "topics": [
+   "Files",
+   "Networking",
+   "Permissions",
+   "Processes",
+   "Services",
+   "Shell",
+   "System",
+   "Troubleshooting",
+   "Users"
+  ]
+ },
+ {
+  "id": "networking",
+  "name": "Networking for DevOps",
+  "items": 18,
+  "questions": 19,
+  "topics": [
+   "Addressing",
+   "DNS",
+   "Fundamentals",
+   "HTTP",
+   "Security",
+   "Troubleshooting"
+  ]
+ },
+ {
+  "id": "git-cicd",
+  "name": "Git & CI/CD",
+  "items": 17,
+  "questions": 18,
+  "topics": [
+   "CI/CD",
+   "Git",
+   "Releases"
+  ]
+ },
+ {
+  "id": "docker",
+  "name": "Docker & Containers",
+  "items": 18,
+  "questions": 18,
+  "topics": [
+   "Compose",
+   "Fundamentals",
+   "Images",
+   "Networking",
+   "Runtime",
+   "Security",
+   "Storage"
+  ]
+ },
+ {
+  "id": "kubernetes",
+  "name": "Kubernetes",
+  "items": 21,
+  "questions": 22,
+  "topics": [
+   "Architecture",
+   "Configuration",
+   "Networking",
+   "Reliability",
+   "Resources",
+   "Scaling",
+   "Scheduling",
+   "Security",
+   "Storage",
+   "Tooling",
+   "Troubleshooting",
+   "Workflow",
+   "Workloads"
+  ]
+ },
+ {
+  "id": "terraform",
+  "name": "Terraform & Infrastructure as Code",
+  "items": 19,
+  "questions": 20,
+  "topics": [
+   "Concepts",
+   "Language",
+   "Security",
+   "State",
+   "Workflow"
+  ]
+ },
+ {
+  "id": "ansible",
+  "name": "Ansible & Configuration Management",
+  "items": 20,
+  "questions": 20,
+  "topics": [
+   "Basics",
+   "Concepts",
+   "Ecosystem",
+   "Orchestration",
+   "Playbooks",
+   "Security",
+   "Variables"
+  ]
+ },
+ {
+  "id": "aws",
+  "name": "AWS Cloud Fundamentals",
+  "items": 21,
+  "questions": 21,
+  "topics": [
+   "Compute",
+   "Concepts",
+   "Cost",
+   "Databases",
+   "Global infrastructure",
+   "IAM",
+   "Messaging",
+   "Networking",
+   "Operations",
+   "Security",
+   "Storage"
+  ]
+ },
+ {
+  "id": "observability-sre",
+  "name": "Observability & SRE",
+  "items": 18,
+  "questions": 19,
+  "topics": [
+   "Fundamentals",
+   "Logs",
+   "Metrics",
+   "Monitoring",
+   "Reliability",
+   "SRE",
+   "Tooling",
+   "Traces"
+  ]
+ },
+ {
+  "id": "devsecops",
+  "name": "DevSecOps & Secrets",
+  "items": 19,
+  "questions": 19,
+  "topics": [
+   "AppSec",
+   "Concepts",
+   "Data",
+   "Governance",
+   "Identity",
+   "Network",
+   "Runtime",
+   "Scanning",
+   "Secrets",
+   "Supply chain"
+  ]
+ }
+]

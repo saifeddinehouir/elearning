@@ -10,9 +10,21 @@ export const LIBRARIES = [
     name: "Java & Spring Boot",
     blurb: "Backend interview prep: Java core, concurrency, design patterns, Spring Core, Boot, Web, Data/JPA, databases, testing and system design.",
     dir: "library/java-spring/",
+    icon: "coffee",
+    short: "Java, Spring, databases, testing, system design",
     // Kept in sync with index.json by tests/library.test.mjs.
     deckCount: 12,
     questionCount: 521,
+  },
+  {
+    key: "devops",
+    name: "DevOps & Infrastructure",
+    blurb: "From Linux and networking to CI/CD, Docker, Kubernetes, Terraform, Ansible, AWS, observability and DevSecOps.",
+    dir: "library/devops/",
+    icon: "server",
+    short: "Linux, CI/CD, Docker, Kubernetes, Terraform, AWS, SRE",
+    deckCount: 10,
+    questionCount: 196,
   },
 ];
 

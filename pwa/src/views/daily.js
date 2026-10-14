@@ -56,9 +56,10 @@ export async function renderDaily() {
     const roadmap = installedPaths.find((r) => r.builtin === path.key);
     if (roadmap) wrap.appendChild(upNextCard(roadmap, decks));
   }
-  for (const lib of LIBRARIES) {
-    if (!installedPaths.some((r) => r.builtin === lib.key)) wrap.appendChild(libraryPromoCard(lib));
-  }
+  // Pitch one library at a time so Today doesn't turn into a catalogue;
+  // Roadmaps lists all of them.
+  const nextLib = LIBRARIES.find((lib) => !installedPaths.some((r) => r.builtin === lib.key));
+  if (nextLib) wrap.appendChild(libraryPromoCard(nextLib));
   const notYet = PATHS.find((p) => !installedPaths.some((r) => r.builtin === p.key));
   if (notYet) wrap.appendChild(pathPromoCard(notYet, { compact: installedPaths.length > 0 }));
   return wrap;
@@ -189,7 +190,7 @@ function welcome() {
     h(
       "div",
       { class: "card hero welcome" },
-      h("div", { class: "kicker" }, "Spaced repetition · Java, Spring & LeetCode"),
+      h("div", { class: "kicker" }, "Spaced repetition · Java, DevOps & LeetCode"),
       h("div", { class: "promo-title" }, "Learn it once. Remember it for good."),
       h(
         "p",
@@ -198,20 +199,22 @@ function welcome() {
       )
     )
   );
-  box.appendChild(
-    h(
-      "button",
-      { class: "card option", onclick: () => installAndOpenLibrary(LIBRARIES[0].key) },
-      h("span", { class: "icon-chip lg", html: ICONS.coffee }),
+  for (const lib of LIBRARIES) {
+    box.appendChild(
       h(
-        "span",
-        { class: "spacer" },
-        h("span", { class: "option-title" }, `Add the ${LIBRARIES[0].name} decks`),
-        h("span", { class: "option-sub" }, `${LIBRARIES[0].deckCount} interview decks, ${LIBRARIES[0].questionCount} questions: Java, Spring, databases, testing, system design.`)
-      ),
-      h("span", { class: "chevron", html: ICONS.chevron })
-    )
-  );
+        "button",
+        { class: "card option", onclick: () => installAndOpenLibrary(lib.key) },
+        h("span", { class: "icon-chip lg", html: ICONS[lib.icon] || ICONS.book }),
+        h(
+          "span",
+          { class: "spacer" },
+          h("span", { class: "option-title" }, `Add the ${lib.name} decks`),
+          h("span", { class: "option-sub" }, `${lib.deckCount} decks, ${lib.questionCount} questions: ${lib.short}.`)
+        ),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      )
+    );
+  }
   box.appendChild(
     h(
       "button",
