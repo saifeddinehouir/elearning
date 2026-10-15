@@ -102,3 +102,8 @@ test("stage completion follows the path's unlock rule", () => {
   assert.equal(isStageDone(half, "mastery"), false);
   assert.equal(isStageDone(null, "seen"), false);
 });
+
+test("former path names never collide with a current one", () => {
+  const current = new Set(PATHS.map((p) => p.name));
+  for (const p of PATHS) for (const old of p.formerNames || []) assert.ok(!current.has(old), `${p.key}: "${old}" is still a current name`);
+});

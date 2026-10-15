@@ -1,6 +1,6 @@
 # DailyQCM — PWA
 
-A spaced-repetition quiz app (course QCMs **and** LeetCode-pattern questions) built as
+A spaced-repetition quiz app (course QCMs **and** coding-interview pattern questions) built as
 an installable Progressive Web App. No build step, no framework, no runtime
 dependencies — plain ES modules, SVG charts, IndexedDB.
 
@@ -107,9 +107,9 @@ pwa/
 (warning); `choices` must have 2–6 entries; `correct_index` must be in range.
 See [`../PROMPT_TEMPLATE.md`](../PROMPT_TEMPLATE.md) for the generator prompt.
 
-## LeetCode Patterns path (built in, PWA only)
+## Coding Interview Patterns path (built in, PWA only)
 
-**Today → Start the LeetCode Patterns path** (or the Roadmaps tab) installs 20
+**Today → Start the Coding Interview Patterns path** (or the Roadmaps tab) installs 20
 algorithm patterns as one roadmap, one deck per pattern, 120 questions in all —
 no JSON generation needed. Content lives in [`src/patterns.js`](src/patterns.js).
 
@@ -126,7 +126,7 @@ no JSON generation needed. Content lives in [`src/patterns.js`](src/patterns.js)
 - Ids and answer positions are deterministic, so reinstalling (after deleting a
   deck) never duplicates anything.
 
-### LeetCode Advanced (the hard path)
+### Advanced Patterns (the hard path)
 
 A second built-in path for after the basics: 15 harder patterns (monotonic
 deque, binary search on the answer, Dijkstra, BFS over states, MST, LIS, interval
@@ -142,7 +142,9 @@ problems and 90 questions, with no easy problems. It's harder in two ways:
 
 Content: [`src/patterns-advanced.js`](src/patterns-advanced.js). Paths are
 declared in `PATHS` in [`src/patterns.js`](src/patterns.js). Never change a
-shipped path's `idPrefix`, because it seeds the stable question ids.
+shipped path's `idPrefix`, because it seeds the stable question ids. A path's
+`name` can change: list the old one in `formerNames` and installed roadmaps
+still using it are renamed on the next start (custom names are kept).
 
 ## Daily challenge
 
@@ -222,7 +224,7 @@ to the normal schedule.
 
 [`src/plan.js`](src/plan.js) defines what each plan can add. Free keeps the
 whole study loop (daily sessions, streak, stats, importing your own decks), the
-core LeetCode Patterns path and the first 2 decks of each library. Pro adds the
+core Coding Interview Patterns path and the first 2 decks of each library. Pro adds the
 rest of the libraries, the Advanced path, interview date mode and, later, AI
 deck generation and cloud sync.
 

@@ -1,4 +1,4 @@
-// "LeetCode Advanced" path: harder patterns that build on the core path.
+// "Advanced Patterns" path: harder patterns that build on the core path.
 // Same shape as PATTERNS in patterns.js (authored correct choice first).
 // `confusers` are chosen so no decoy is ALSO a valid way to solve every
 // problem in the stage: a recognition question must have one right answer.

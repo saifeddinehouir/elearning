@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "DailyQCM — spaced-repetition quiz PWA (course QCMs + LeetCode-pattern questions)",
+  "description": "DailyQCM — spaced-repetition quiz PWA (course QCMs + coding-interview pattern questions)",
   "scripts": {
     "serve": "node tools/serve.mjs",
     "test": "node --test",

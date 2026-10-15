@@ -1,7 +1,7 @@
 {
   "name": "DailyQCM",
   "short_name": "DailyQCM",
-  "description": "Spaced-repetition quiz app for course prep and LeetCode-pattern practice.",
+  "description": "Spaced-repetition quiz app for course prep and coding-interview pattern practice.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

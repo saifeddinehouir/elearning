@@ -195,7 +195,7 @@ function welcome() {
     h(
       "div",
       { class: "card hero welcome" },
-      h("div", { class: "kicker" }, "Spaced repetition · Java, DevOps & LeetCode"),
+      h("div", { class: "kicker" }, "Spaced repetition · Java, DevOps & algorithms"),
       h("div", { class: "promo-title" }, "Learn it once. Remember it for good."),
       h(
         "p",
@@ -228,7 +228,7 @@ function welcome() {
       h(
         "span",
         { class: "spacer" },
-        h("span", { class: "option-title" }, "Start the LeetCode Patterns path"),
+        h("span", { class: "option-title" }, "Start the Coding Interview Patterns path"),
         h("span", { class: "option-sub" }, "20 patterns, built in. Learn to recognise which one a problem needs.")
       ),
       h("span", { class: "chevron", html: ICONS.chevron })

@@ -42,9 +42,9 @@ export async function challengeCard({ onNeedContent } = {}) {
 
   if (n === 0) {
     card.appendChild(
-      h("p", { class: "small muted", style: "margin-top:12px" }, "Challenges draw from all your decks. Add one — or start the LeetCode Patterns path — to unlock them.")
+      h("p", { class: "small muted", style: "margin-top:12px" }, "Challenges draw from all your decks. Add one — or start the Coding Interview Patterns path — to unlock them.")
     );
-    if (onNeedContent) card.appendChild(h("button", { class: "btn block mt", onclick: onNeedContent }, "Start the LeetCode Patterns path"));
+    if (onNeedContent) card.appendChild(h("button", { class: "btn block mt", onclick: onNeedContent }, "Start the Coding Interview Patterns path"));
     return card;
   }
 

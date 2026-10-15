@@ -603,6 +603,20 @@ export async function installPatternPath(key = PATTERN_PATH.key) {
   return roadmap;
 }
 
+// Renames installed built-in paths still carrying a name the path used to ship
+// under (see formerNames in patterns.js). A name you chose yourself is kept.
+// Returns how many were renamed.
+export async function renameBuiltinPaths() {
+  const renamed = (await dbGetAll(STORES.roadmaps))
+    .map((r) => [r, pathByKey.get(r.builtin)])
+    .filter(([r, path]) => path && (path.formerNames || []).includes(r.name))
+    .map(([r, path]) => ({ ...r, name: path.name }));
+  if (renamed.length === 0) return 0;
+  await dbBulkPut(STORES.roadmaps, renamed);
+  emit();
+  return renamed.length;
+}
+
 // Unlocks every built-in path stage whose previous stage is done. Returns the
 // titles that were newly unlocked. Never re-locks anything, and only ever
 // turns "include in daily mix" ON — a manual opt-out made after unlocking is

@@ -1,4 +1,4 @@
-// Built-in "LeetCode Patterns" path: 20 algorithm patterns in learning order,
+// Built-in "Coding Interview Patterns" path: 20 algorithm patterns in learning order,
 // each with a recognition guide (signals / core idea / template) and a few
 // representative problems. Problem statements are short paraphrases.
 //
@@ -15,7 +15,10 @@ import { ADVANCED_PATTERNS } from "./patterns-advanced.js";
 
 export const PATTERN_PATH = {
   key: "lc-patterns",
-  name: "LeetCode Patterns",
+  name: "Coding Interview Patterns",
+  // Names this path shipped under; installed roadmaps still carrying one are
+  // renamed on start (see renameBuiltinPaths in store.js).
+  formerNames: ["LeetCode Patterns"],
   blurb: "20 core patterns, from hash maps to bit tricks. Learn to recognise which one a problem wants before you write a line.",
 };
 
@@ -1302,7 +1305,8 @@ export const PATHS = [
   { ...PATTERN_PATH, patterns: PATTERNS, idPrefix: "lcp", deckPrefix: "Pattern", decoys: 3, unlock: "seen", tone: "core" },
   {
     key: "lc-advanced",
-    name: "LeetCode Advanced",
+    name: "Advanced Patterns",
+    formerNames: ["LeetCode Advanced"],
     blurb: "15 harder patterns — deques, Dijkstra, interval & bitmask DP, KMP, segment trees. Five-way recognition questions, and stages unlock only on mastery.",
     patterns: ADVANCED_PATTERNS,
     idPrefix: "lca",

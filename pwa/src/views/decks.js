@@ -66,9 +66,9 @@ export async function renderDecks() {
       h(
         "div",
         { class: "row", style: "gap:10px;justify-content:center;flex-wrap:wrap" },
-        h("button", { class: "btn", onclick: installAndOpenPath }, "Start LeetCode Patterns path"),
+        h("button", { class: "btn", onclick: installAndOpenPath }, "Start Coding Interview Patterns path"),
         h("button", { class: "btn", onclick: () => sample("course") }, "Load course sample"),
-        h("button", { class: "btn", onclick: () => sample("leetcode") }, "Load LeetCode sample")
+        h("button", { class: "btn", onclick: () => sample("leetcode") }, "Load algorithms sample")
       )
     );
     return wrap;
@@ -290,7 +290,7 @@ export async function openDeckDetail(deckId) {
         h(
           "div",
           { class: "meta mt" },
-          h("span", {}, deck.sourceType === "leetcode" ? "LeetCode" : "Course"),
+          h("span", {}, deck.sourceType === "leetcode" ? "Algorithms" : "Course"),
           h("span", {}, `${items.length} items`),
           h("span", {}, `${totalQ} questions`)
         ),
