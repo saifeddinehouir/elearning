@@ -34,3 +34,9 @@ export const libraryByKey = new Map(LIBRARIES.map((l) => [l.key, l]));
 export const libraryKeyFor = (lib, deckId) => `${lib.key}:${deckId}`;
 export const libraryOfDeck = (deck) =>
   deck && deck.libraryKey ? libraryByKey.get(String(deck.libraryKey).split(":")[0]) || null : null;
+
+// Entries of a library's index.json that have no deck on this device yet.
+export const missingEntries = (lib, index, decks) => {
+  const have = new Set(decks.map((d) => d.libraryKey).filter(Boolean));
+  return index.filter((e) => !have.has(libraryKeyFor(lib, e.id)));
+};

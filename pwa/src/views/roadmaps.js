@@ -18,8 +18,8 @@ import { ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 import { PATHS, PATTERN_PATH, pathByKey, isStageDone, MASTERY } from "../patterns.js";
 import { openCheatSheet } from "./guide.js";
 import { ring } from "../charts.js";
-import { LIBRARIES, libraryByKey } from "../library.js";
-import { installLibrary, getPlan, ProRequiredError } from "../store.js";
+import { LIBRARIES, libraryByKey, missingEntries } from "../library.js";
+import { installLibrary, getLibraryIndex, getPlan, ProRequiredError } from "../store.js";
 import { canInstallPath, isPro, FREE_LIBRARY_DECKS } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
 
@@ -359,6 +359,7 @@ export function openRoadmapDetail(roadmapId) {
     let editMode = false;
     let roadmap = null;
     let decks = [];
+    let missing = []; // library decks not on this device yet
 
     async function refresh() {
       const [freshDecks, roadmaps] = await Promise.all([listDecks(), listRoadmaps()]);
@@ -369,7 +370,46 @@ export function openRoadmapDetail(roadmapId) {
       }
       roadmap = freshRoadmap;
       decks = freshDecks;
+      const lib = libraryByKey.get(roadmap.builtin);
+      missing = [];
+      if (lib) {
+        try {
+          missing = missingEntries(lib, await getLibraryIndex(lib.key), decks);
+        } catch {} // offline with nothing cached: just don't offer more
+      }
       paint();
+    }
+
+    // Library decks you don't have yet: an upgrade pitch on the free plan,
+    // a one-tap add on Pro.
+    function moreCard() {
+      const lib = libraryByKey.get(roadmap.builtin);
+      if (!lib || missing.length === 0) return null;
+      const pro = isPro(getPlan());
+      const n = missing.length;
+      const questions = missing.reduce((s, e) => s + e.questions, 0);
+      return h(
+        "div",
+        { class: `card${pro ? "" : " pro"}` },
+        h("div", { class: "kicker" }, pro ? "Not added yet" : "With Pro"),
+        h("div", { class: "promo-title" }, `${n} more deck${n === 1 ? "" : "s"}`),
+        h("p", { class: "small muted", style: "margin:4px 0 10px" }, `${questions} questions you don't have yet.`),
+        h("div", { class: "promo-chips" }, ...missing.map((e) => h("span", { class: "chip" }, e.name))),
+        pro
+          ? h(
+              "button",
+              {
+                class: "btn primary block mt",
+                onclick: async () => {
+                  await installLibrary(lib.key);
+                  toast(`Added ${n} deck${n === 1 ? "" : "s"} to your daily mix`);
+                  await refresh();
+                },
+              },
+              `Add ${n === 1 ? "it" : `all ${n}`}`
+            )
+          : h("button", { class: "btn primary block mt", onclick: () => openPaywall(`The full ${lib.name} library`) }, "Unlock with Pro")
+      );
     }
 
     function paint() {
@@ -385,6 +425,8 @@ export function openRoadmapDetail(roadmapId) {
         // The picker replaced this overlay, so reopen rather than repaint a detached node.
         card.appendChild(renderPathNodes(decks, roadmap, { onAttached: () => openRoadmapDetail(roadmapId) }));
         body.appendChild(card);
+        const more = moreCard();
+        if (more) body.appendChild(more);
       }
 
       body.appendChild(

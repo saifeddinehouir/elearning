@@ -637,6 +637,14 @@ export async function syncPathUnlocks() {
 
 // ---------- Built-in deck libraries (e.g. Java & Spring Boot) ----------
 
+// A library's index.json: its decks in study order with names, counts and
+// topics. Served from the offline cache when there's no network.
+export async function getLibraryIndex(key) {
+  const lib = libraryByKey.get(key);
+  if (!lib) throw new Error(`Unknown library ${key}`);
+  return (await fetch(`${lib.dir}index.json`)).json();
+}
+
 // Installs (or repairs) a library: every deck in its index.json, in order,
 // plus a roadmap with all stages open. A deck already installed from the
 // library is reused; a deck you imported yourself under the same name is
@@ -646,7 +654,7 @@ export async function syncPathUnlocks() {
 export async function installLibrary(key) {
   const lib = libraryByKey.get(key);
   if (!lib) throw new Error(`Unknown library ${key}`);
-  const index = libraryEntriesFor(getPlan(), await (await fetch(`${lib.dir}index.json`)).json());
+  const index = libraryEntriesFor(getPlan(), await getLibraryIndex(key));
   const [decks, roadmaps] = await Promise.all([dbGetAll(STORES.decks), dbGetAll(STORES.roadmaps)]);
   const byLibKey = new Map(decks.filter((d) => d.libraryKey).map((d) => [d.libraryKey, d]));
   const byName = new Map(decks.filter((d) => !d.libraryKey && !d.builtinKey).map((d) => [d.name, d]));

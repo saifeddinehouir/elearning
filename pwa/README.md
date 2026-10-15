@@ -227,8 +227,9 @@ rest of the libraries, the Advanced path, interview date mode and, later, AI
 deck generation and cloud sync.
 
 - Gating only applies to **adding** content. Anything already on the device
-  stays usable on any plan, and installing a library again after upgrading
-  adds its remaining decks to the same roadmap.
+  stays usable on any plan. A library's roadmap lists the decks you don't
+  have yet: **Unlock with Pro** on the free plan, **Add all** on Pro (they
+  join the same roadmap).
 - `ENFORCE` is `false`, so everyone is on Pro until billing exists.
   **Settings → Plan** has a per-device preview switch (Default / Free / Pro).
 - The switch is client-side only. Real enforcement needs accounts, a payment
