@@ -192,6 +192,23 @@ listed in study order by its `index.json`. Installing again repairs missing
 decks without duplicating, and a deck you imported yourself under the same
 name is adopted with its progress.
 
+## Free and Pro plans (not enforced yet)
+
+[`src/plan.js`](src/plan.js) defines what each plan can add. Free keeps the
+whole study loop (daily sessions, streak, stats, importing your own decks), the
+core LeetCode Patterns path and the first 2 decks of each library. Pro adds the
+rest of the libraries, the Advanced path and, later, AI deck generation, cloud
+sync and interview-date mode.
+
+- Gating only applies to **adding** content. Anything already on the device
+  stays usable on any plan, and installing a library again after upgrading
+  adds its remaining decks to the same roadmap.
+- `ENFORCE` is `false`, so everyone is on Pro until billing exists.
+  **Settings → Plan** has a per-device preview switch (Default / Free / Pro).
+- The switch is client-side only. Real enforcement needs accounts, a payment
+  provider and Pro content served from behind a login, because everything
+  under `library/` is currently public.
+
 ## Backups — read this on iPhone
 
 A Home Screen web app on iOS has **its own storage, separate from Safari**.

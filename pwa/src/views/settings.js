@@ -1,5 +1,7 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt } from "../store.js";
+import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride } from "../store.js";
+import { isPro } from "../plan.js";
+import { openPaywall } from "./paywall.js";
 import { fmtDateFull } from "../format.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
@@ -153,6 +155,54 @@ export function openSettings() {
           : "Notification permission not requested yet.";
     }
     paintPermission();
+
+    // ---------- Plan ----------
+    body.appendChild(h("div", { class: "section-header" }, "Plan"));
+    const planList = h("div", { class: "list" });
+    const planName = h("span", {});
+    const paintPlan = () => (planName.textContent = isPro(getPlan()) ? "Pro" : "Free");
+    paintPlan();
+    planList.appendChild(
+      h(
+        "button",
+        { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => openPaywall() },
+        h("span", { class: "icon-chip c-accent", html: ICONS.sparkle }),
+        h("span", { class: "label" }, planName, h("span", { class: "sub" }, "See what Pro includes")),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      )
+    );
+    body.appendChild(planList);
+
+    const previewWrap = h("div", { class: "list", style: "padding:12px 16px" });
+    const previewControl = h("div", { class: "segmented" });
+    const previewButtons = [];
+    const currentOverride = getPlanOverride() || "default";
+    for (const [val, label] of [
+      ["default", "Default"],
+      ["free", "Free"],
+      ["pro", "Pro"],
+    ]) {
+      const btn = h(
+        "button",
+        {
+          class: currentOverride === val ? "active" : "",
+          onclick: () => {
+            setPlanOverride(val === "default" ? null : val);
+            for (const b of previewButtons) b.classList.toggle("active", b.dataset.val === val);
+            paintPlan();
+          },
+        },
+        label
+      );
+      btn.dataset.val = val;
+      previewButtons.push(btn);
+      previewControl.appendChild(btn);
+    }
+    previewWrap.appendChild(previewControl);
+    body.appendChild(previewWrap);
+    body.appendChild(
+      h("p", { class: "list-footnote" }, "Preview the app as a free or Pro user on this device. Payments aren't live yet, so Default is Pro. Nothing you've already added is ever removed.")
+    );
 
     // ---------- Backup ----------
     body.appendChild(h("div", { class: "section-header" }, "Backup"));

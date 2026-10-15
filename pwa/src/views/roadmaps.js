@@ -19,14 +19,21 @@ import { PATHS, PATTERN_PATH, pathByKey, isStageDone, MASTERY } from "../pattern
 import { openCheatSheet } from "./guide.js";
 import { ring } from "../charts.js";
 import { LIBRARIES, libraryByKey } from "../library.js";
-import { installLibrary } from "../store.js";
+import { installLibrary, getPlan, ProRequiredError } from "../store.js";
+import { canInstallPath, isPro, FREE_LIBRARY_DECKS } from "../plan.js";
+import { openPaywall, proBadge } from "./paywall.js";
 
 // Installs (or repairs) a built-in deck library and opens its roadmap.
 export async function installAndOpenLibrary(key) {
   const lib = libraryByKey.get(typeof key === "string" ? key : LIBRARIES[0].key);
   toast(`Adding ${lib.name}…`);
   const roadmap = await installLibrary(lib.key);
-  toast(`${lib.name}: ${lib.deckCount} decks added to your daily mix`);
+  const n = roadmap.nodes.length;
+  if (n < lib.deckCount && !isPro(getPlan())) {
+    toast(`${lib.name}: ${n} free decks added. The other ${lib.deckCount - n} come with Pro`, 4000);
+  } else {
+    toast(`${lib.name}: ${n} decks added to your daily mix`);
+  }
   openRoadmapDetail(roadmap.id);
 }
 
@@ -43,7 +50,7 @@ export function libraryPromoCard(lib = LIBRARIES[0]) {
       { class: "meta", style: "margin:0 0 12px" },
       h("span", {}, `${lib.deckCount} decks`),
       h("span", {}, `${lib.questionCount} questions`),
-      h("span", {}, "all open")
+      h("span", {}, isPro(getPlan()) ? "all open" : `${FREE_LIBRARY_DECKS} decks free`)
     ),
     h("button", { class: "btn primary block", onclick: () => installAndOpenLibrary(lib.key) }, `Add ${lib.name}`)
   );
@@ -58,7 +65,13 @@ export const pathClass = (tone) => (tone ? ` builtin-path${tone === "hard" ? " h
 // a non-string argument (the click event) means the core path.
 export async function installAndOpenPath(key) {
   const path = pathByKey.get(typeof key === "string" ? key : PATTERN_PATH.key);
-  const roadmap = await installPatternPath(path.key);
+  let roadmap;
+  try {
+    roadmap = await installPatternPath(path.key);
+  } catch (err) {
+    if (err instanceof ProRequiredError) return openPaywall(path.name);
+    throw err;
+  }
   toast(`${path.name} ready — stage 1 is in your daily mix`);
   openRoadmapDetail(roadmap.id);
 }
@@ -67,10 +80,11 @@ export async function installAndOpenPath(key) {
 export function pathPromoCard(path = PATHS[0], { compact = false } = {}) {
   const questions = path.patterns.reduce((n, p) => n + p.problems.length * 2, 0);
   const hard = path.tone === "hard";
+  const locked = !canInstallPath(getPlan(), path.key);
   return h(
     "div",
     { class: `card promo${pathClass(path.tone)}` },
-    h("div", { class: "kicker" }, hard ? "Built-in path · challenging" : "Built-in path"),
+    h("div", { class: "kicker" }, hard ? "Built-in path · challenging" : "Built-in path", locked ? proBadge() : null),
     h("div", { class: "promo-title" }, path.name),
     h("p", { class: "small muted", style: "margin:4px 0 12px" }, path.blurb),
     compact
@@ -91,7 +105,9 @@ export function pathPromoCard(path = PATHS[0], { compact = false } = {}) {
     h(
       "div",
       { class: "row", style: "gap:10px" },
-      h("button", { class: `btn ${hard ? "hard-btn" : "primary"} block`, onclick: () => installAndOpenPath(path.key) }, hard ? "Take the challenge" : "Start the path"),
+      locked
+        ? h("button", { class: "btn primary block", onclick: () => openPaywall(path.name) }, "Unlock with Pro")
+        : h("button", { class: `btn ${hard ? "hard-btn" : "primary"} block`, onclick: () => installAndOpenPath(path.key) }, hard ? "Take the challenge" : "Start the path"),
       h("button", { class: "btn", onclick: () => openCheatSheet(path.key) }, "Cheat sheet")
     )
   );
