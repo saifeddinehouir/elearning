@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS = {
   reminderHour: 19,
   reminderMinute: 0,
   theme: "system", // "system" | "light" | "dark"
+  interview: null, // { date, setOn } as day starts (ms), see interview.js
 };
 
 export function getSettings() {

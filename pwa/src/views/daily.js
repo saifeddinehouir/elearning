@@ -12,16 +12,20 @@ import { installAndOpenPath, installAndOpenLibrary, openRoadmapDetail, pathPromo
 import { LIBRARIES } from "../library.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
+import { dailySetup, interviewCard } from "./interview.js";
 
 export async function renderDaily() {
-  const [pool, studyDays, decks, installedPaths] = await Promise.all([
+  const [allPool, studyDays, decks, installedPaths] = await Promise.all([
     getDailyPool(),
     getAllStudyDays(),
     listDecks(),
     getPatternPaths(),
   ]);
   const settings = getSettings();
-  const config = { size: settings.dailyGoal, newLimitRatio: settings.newLimitRatio };
+  // With an interview date set, the pool's review dates and the session size
+  // follow the interview plan instead of the plain settings.
+  const setup = dailySetup(allPool, settings);
+  const { pool, config } = setup;
 
   const wrap = h("div", {});
   wrap.appendChild(
@@ -47,6 +51,7 @@ export async function renderDaily() {
   const answeredToday = today ? today.answered : 0;
   const streakN = currentStreak(studyDays);
   wrap.appendChild(goalCard(pool, config, settings.dailyGoal, answeredToday, streakN));
+  if (pool.length > 0) wrap.appendChild(interviewCard(pool, setup));
 
   wrap.appendChild(await challengeCard({ onNeedContent: installAndOpenPath }));
 

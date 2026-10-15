@@ -32,9 +32,12 @@ function weightedShuffle(items, weightFn) {
 const isNew = (q) => !q.reviewState || (q.reviewState.totalReviews || 0) === 0;
 const isSeen = (q) => q.reviewState && q.reviewState.totalReviews > 0;
 
+// config.newLimit (optional) is an exact cap on new questions that replaces
+// the ratio and the final top-up with new ones; interview mode sets it.
 export function composeSession(questions, config = DEFAULT_CONFIG, now = Date.now()) {
   const size = config.size ?? DEFAULT_CONFIG.size;
   const newLimitRatio = config.newLimitRatio ?? DEFAULT_CONFIG.newLimitRatio;
+  const newLimit = Number.isFinite(config.newLimit) ? Math.max(0, config.newLimit) : null;
 
   if (size <= 0 || questions.length === 0) {
     return { queue: [], due: 0, new: 0, ahead: 0, total: 0 };
@@ -72,7 +75,7 @@ export function composeSession(questions, config = DEFAULT_CONFIG, now = Date.no
 
   // 2. New questions, soft-capped so reviews are not crowded out.
   if (chosen.length < size) {
-    const cap = Math.max(newQs.length ? 1 : 0, Math.round(size * newLimitRatio));
+    const cap = newLimit ?? Math.max(newQs.length ? 1 : 0, Math.round(size * newLimitRatio));
     fresh += take(weightedShuffle(newQs, weight), Math.min(size - chosen.length, cap));
   }
 
@@ -85,7 +88,7 @@ export function composeSession(questions, config = DEFAULT_CONFIG, now = Date.no
   }
 
   // 4. Any remaining new questions to reach the goal.
-  if (chosen.length < size) {
+  if (chosen.length < size && newLimit === null) {
     fresh += take(newQs, size - chosen.length);
   }
 

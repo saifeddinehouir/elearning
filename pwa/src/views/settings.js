@@ -1,7 +1,8 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride } from "../store.js";
 import { isPro } from "../plan.js";
-import { openPaywall } from "./paywall.js";
+import { openPaywall, proBadge } from "./paywall.js";
+import { openInterviewSheet } from "./interview.js";
 import { fmtDateFull } from "../format.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
@@ -92,6 +93,28 @@ export function openSettings() {
     body.appendChild(ratioSliderWrap);
     body.appendChild(
       h("p", { class: "list-footnote" }, "Keeps reviews from being crowded out by new questions in a single session.")
+    );
+
+    const iv = s.interview;
+    const interviewList = h("div", { class: "list" });
+    interviewList.appendChild(
+      h(
+        "button",
+        { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => openInterviewSheet() },
+        h("span", { class: "icon-chip c-accent", html: ICONS.target }),
+        h(
+          "span",
+          { class: "label" },
+          "Interview date",
+          isPro(getPlan()) ? null : proBadge(),
+          h("span", { class: "sub" }, iv ? fmtDateFull(iv.date) : "Not set")
+        ),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      )
+    );
+    body.appendChild(interviewList);
+    body.appendChild(
+      h("p", { class: "list-footnote" }, "Paces new questions and reviews so everything in your daily mix is covered by the day. While it's set, it decides the session size.")
     );
 
     function bumpGoal(delta) {

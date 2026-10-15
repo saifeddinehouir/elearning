@@ -192,13 +192,37 @@ listed in study order by its `index.json`. Installing again repairs missing
 decks without duplicating, and a deck you imported yourself under the same
 name is adopted with its progress.
 
+## Interview date mode
+
+**Today → Interview coming up?** (or **Settings → Interview date**) sets the
+day. Until then, Today's session follows a plan over the decks in your daily
+mix. Logic: [`src/interview.js`](src/interview.js).
+
+- **Reviews land before the interview.** A review whose SM-2 date falls on or
+  after the interview counts as due in the last 3 days before it, spread by
+  question so they don't pile onto one night, and never sooner than the day
+  after you last answered it.
+- **New questions are paced.** Unseen questions are split evenly over the
+  days left. The final 0–2 days (based on how much notice you gave) and the
+  day itself are review only.
+- **Session size** becomes today's due reviews plus today's new share: at
+  least your daily goal, at most 60. Past 60 the card says you're behind and
+  suggests trimming the mix.
+- **Readiness**: a question is ready when its latest answer was right. The
+  card shows the overall score and the weakest topics, and a sheet lists every
+  topic.
+
+Nothing is written to your review history. The plan only changes how the
+queue is built, so removing the date (or letting it pass) returns everything
+to the normal schedule.
+
 ## Free and Pro plans (not enforced yet)
 
 [`src/plan.js`](src/plan.js) defines what each plan can add. Free keeps the
 whole study loop (daily sessions, streak, stats, importing your own decks), the
 core LeetCode Patterns path and the first 2 decks of each library. Pro adds the
-rest of the libraries, the Advanced path and, later, AI deck generation, cloud
-sync and interview-date mode.
+rest of the libraries, the Advanced path, interview date mode and, later, AI
+deck generation and cloud sync.
 
 - Gating only applies to **adding** content. Anything already on the device
   stays usable on any plan, and installing a library again after upgrading
