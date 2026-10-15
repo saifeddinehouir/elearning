@@ -1,5 +1,6 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride } from "../store.js";
+import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride, getEntitlement } from "../store.js";
+import { accountsConfigured, currentUser, signIn, signOut, onAccountChange } from "../account.js";
 import { isPro } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
 import { openInterviewSheet } from "./interview.js";
@@ -178,6 +179,55 @@ export function openSettings() {
           : "Notification permission not requested yet.";
     }
     paintPermission();
+
+    // ---------- Account ----------
+    if (accountsConfigured()) {
+      body.appendChild(h("div", { class: "section-header" }, "Account"));
+      const accountList = h("div", { class: "list" });
+      const paintAccount = () => {
+        accountList.replaceChildren();
+        const u = currentUser();
+        if (!u) {
+          accountList.appendChild(
+            h(
+              "button",
+              {
+                class: "list-row tappable",
+                style: "width:100%;text-align:left",
+                onclick: () => signIn().catch((err) => toast(err.message || "Couldn't sign in", 3000)),
+              },
+              h("span", { class: "icon-chip c-accent", html: ICONS.unlock }),
+              h("span", { class: "label" }, "Sign in with Google", h("span", { class: "sub" }, "Needed for Pro and video decks")),
+              h("span", { class: "chevron", html: ICONS.chevron })
+            )
+          );
+          return;
+        }
+        const ent = getEntitlement();
+        const planLine = ent?.plan === "pro"
+          ? ent.subscription
+            ? "Pro, yearly"
+            : `Pro until ${fmtDateFull(ent.proUntil)}`
+          : "Free plan";
+        accountList.appendChild(
+          h(
+            "div",
+            { class: "list-row inset" },
+            h("span", { class: "icon-chip c-accent", html: ICONS.unlock }),
+            h("span", { class: "label" }, u.email || u.name || "Signed in", h("span", { class: "sub" }, planLine)),
+            h(
+              "button",
+              { class: "btn", onclick: () => signOut().then(() => toast("Signed out")) },
+              "Sign out"
+            )
+          )
+        );
+      };
+      paintAccount();
+      // Stops listening the first time a change arrives after the sheet closed.
+      const off = onAccountChange(() => (accountList.isConnected ? paintAccount() : off()));
+      body.appendChild(accountList);
+    }
 
     // ---------- Plan ----------
     body.appendChild(h("div", { class: "section-header" }, "Plan"));

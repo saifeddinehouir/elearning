@@ -1,9 +1,13 @@
-import { h, clear, openOverlay, toast } from "../dom.js";
+import { h, clear, openOverlay, toast, ICONS } from "../dom.js";
 import { parseDeck, validateDeck, validateRoadmap, detectKind } from "../schema.js";
-import { importDeck, importRoadmap, findDeckByName } from "../store.js";
+import { importDeck, importRoadmap, findDeckByName, getPlan } from "../store.js";
+import { isPro } from "../plan.js";
+import { proBadge } from "./paywall.js";
+import { openVideoImport } from "./video-import.js";
 import { PROMPT_TEMPLATE, ROADMAP_PROMPT_TEMPLATE, copyText } from "../prompt-template.js";
 
-export function openImport(prefill = "") {
+// `label` names a prefilled deck in the list (e.g. one made from a video).
+export function openImport(prefill = "", { label = "Pasted JSON" } = {}) {
   openOverlay((close) => {
     const overlay = h("div", { class: "overlay" });
     const head = h("div", { class: "o-head" });
@@ -247,6 +251,18 @@ export function openImport(prefill = "") {
     }
 
     body.append(
+      h(
+        "button",
+        { class: "card option", style: "margin-bottom:12px", onclick: () => openVideoImport() },
+        h("span", { class: "icon-chip lg", html: ICONS.play }),
+        h(
+          "span",
+          { class: "spacer" },
+          h("span", { class: "option-title" }, "From a YouTube video", isPro(getPlan()) ? null : proBadge()),
+          h("span", { class: "option-sub" }, "Paste a lecture or tutorial link and get a deck built from what it teaches.")
+        ),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      ),
       promptDetails("🤖 No content yet? Copy the deck generator prompt for ChatGPT / Claude", PROMPT_TEMPLATE),
       promptDetails("Planning a curriculum? Copy the roadmap generator prompt instead", ROADMAP_PROMPT_TEMPLATE),
       h("label", { class: "field" }, h("span", {}, "Paste JSON (a deck or a roadmap)"), ta),
@@ -257,7 +273,7 @@ export function openImport(prefill = "") {
       resultsList
     );
 
-    if (prefill.trim()) addCandidate("paste", "Pasted JSON", prefill);
+    if (prefill.trim()) addCandidate("paste", label, prefill);
     else paint();
 
     return overlay;

@@ -1,6 +1,25 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getPlan } from "../store.js";
 import { PRO_FEATURES, isPro } from "../plan.js";
+import { OFFERS } from "../config.js";
+import { accountsConfigured, currentUser, signIn, startCheckout } from "../account.js";
+
+// Signs in if needed, then hands over to Stripe Checkout.
+async function buy(offerId, button) {
+  if (!accountsConfigured()) return toast("Payments aren't set up yet", 3000);
+  button.disabled = true;
+  try {
+    if (!currentUser()) await signIn();
+    if (!currentUser()) return; // closed the sign-in window, or redirecting
+    toast("Opening checkout…");
+    await startCheckout(offerId);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || "Couldn't open checkout. Try again.", 3500);
+  } finally {
+    button.disabled = false;
+  }
+}
 
 // The "what Pro adds" sheet. `reason` names what the user just tried to open.
 export function openPaywall(reason = "") {
@@ -37,14 +56,26 @@ export function openPaywall(reason = "") {
     body.appendChild(list);
 
     if (!pro) {
+      body.appendChild(h("div", { class: "section-header" }, "Get Pro"));
+      for (const offer of OFFERS) {
+        body.appendChild(
+          h(
+            "button",
+            { class: "card option", onclick: (e) => buy(offer.id, e.currentTarget) },
+            h(
+              "span",
+              { class: "spacer" },
+              h("span", { class: "option-title" }, offer.title),
+              h("span", { class: "option-sub" }, offer.sub)
+            ),
+            offer.price ? h("strong", {}, offer.price) : null,
+            h("span", { class: "chevron", html: ICONS.chevron })
+          )
+        );
+      }
       body.appendChild(
-        h(
-          "button",
-          { class: "btn primary block mt", onclick: () => toast("Payments aren't set up yet", 3000) },
-          "Upgrade to Pro"
-        )
+        h("p", { class: "list-footnote" }, "Payment is handled by Stripe. Anything already on this device stays yours, whatever your plan.")
       );
-      body.appendChild(h("p", { class: "list-footnote" }, "Anything already on this device stays yours, whatever your plan."));
     }
     return overlay;
   });

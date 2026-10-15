@@ -8,5 +8,10 @@
     "serve": "node tools/serve.mjs",
     "test": "node --test",
     "icons": "node tools/make-icons.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "firebase-admin": "^14.5.0",
+    "stripe": "^23.0.0"
   }
 }

@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Only the server (firebase-admin in pwa/api, which bypasses these rules)
+// writes account data. A signed-in user may read their own plan; nobody can
+// write anything from the browser, so Pro can't be granted client-side.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

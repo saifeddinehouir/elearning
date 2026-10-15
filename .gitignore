@@ -23,3 +23,8 @@ build/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Node
+node_modules/
+.vercel/
+.env*.local

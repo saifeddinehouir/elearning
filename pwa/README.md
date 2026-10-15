@@ -225,8 +225,8 @@ to the normal schedule.
 [`src/plan.js`](src/plan.js) defines what each plan can add. Free keeps the
 whole study loop (daily sessions, streak, stats, importing your own decks), the
 core Coding Interview Patterns path and the first 2 decks of each library. Pro adds the
-rest of the libraries, the Advanced path, interview date mode and, later, AI
-deck generation and cloud sync.
+rest of the libraries, the Advanced path, interview date mode, decks made from
+YouTube videos and, later, cloud sync.
 
 - Gating only applies to **adding** content. Anything already on the device
   stays usable on any plan. A library's roadmap lists the decks you don't
@@ -234,9 +234,76 @@ deck generation and cloud sync.
   join the same roadmap).
 - `ENFORCE` is `false`, so everyone is on Pro until billing exists.
   **Settings → Plan** has a per-device preview switch (Default / Free / Pro).
-- The switch is client-side only. Real enforcement needs accounts, a payment
-  provider and Pro content served from behind a login, because everything
-  under `library/` is currently public.
+- A plan bought through Stripe (see below) is checked by the server and
+  cached on the device, so it counts even with `ENFORCE` off. The preview
+  switch still overrides it on that device.
+- Server-side features (video decks) are enforced by the server. Built-in
+  content is not yet: everything under `library/` is public, so the free
+  limits there are a nudge, not a lock, until Pro content moves behind
+  `/api`.
+
+## Server: accounts, payments and video decks
+
+Optional. With `FIREBASE_CONFIG` left `null` in [`src/config.js`](src/config.js)
+the app is the same static PWA as before. Filled in, it gains Google sign-in,
+Stripe checkout, and **Import → From a YouTube video**. The server is a set of
+Vercel functions in [`api/`](api/) (web-standard `fetch` handlers):
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/me` | The signed-in user's plan and video-deck usage |
+| `POST /api/checkout` | A Stripe Checkout page for `pass` (one-off, 90 days) or `yearly` |
+| `POST /api/stripe-webhook` | Grants or removes Pro from Stripe events, once per event |
+| `POST /api/youtube-deck` | A deck from a YouTube video (Pro, 30 a month) |
+
+**Video decks.** The server sends the transcript to Claude (`claude-opus-5-5`,
+structured output in the app's deck schema, server-side refusal fallback on)
+and returns a deck that has already passed the app's validator. The app then
+opens it in the Import screen to review. The transcript comes from one of two
+places:
+
+- **Pasted:** on YouTube, open the description, tap *Show transcript*, then
+  copy it. This always works when the video has captions.
+- **An MCP server:** set `TRANSCRIPT_MCP_URL` (and `TRANSCRIPT_MCP_TOKEN` if
+  it needs one) to a remote MCP server with a transcript tool, and Claude
+  fetches the transcript itself through the API's MCP connector, so no paste
+  is needed. Without it, the app asks for a paste.
+
+Long transcripts (over ~200k characters) are refused, not cut. A failed
+generation doesn't count toward the monthly 30.
+
+### Setting it up
+
+1. **Firebase**: create a project, enable *Authentication → Google*, and
+   create a Firestore database. Deploy [`../firebase/firestore.rules`](../firebase/firestore.rules)
+   (users can read only their own plan, and only the server can write). Add a
+   *Web app* and paste its config into `FIREBASE_CONFIG`. Add your Vercel
+   domain under *Authentication → Settings → Authorized domains*. Create a
+   service-account key (*Project settings → Service accounts*) for the server.
+2. **Stripe**: create two prices, a one-off price for the interview pass and
+   a yearly recurring price. Add a webhook to
+   `https://<your-domain>/api/stripe-webhook` for `checkout.session.completed`
+   and `customer.subscription.created` / `.updated` / `.deleted`.
+3. **Vercel**: import the repo with **Root Directory `pwa`** (framework
+   *Other*, no build command), and set these environment variables:
+
+   | Variable | Value |
+   |---|---|
+   | `FIREBASE_SERVICE_ACCOUNT` | the service-account JSON, on one line |
+   | `STRIPE_SECRET_KEY` | `sk_live_…` (or `sk_test_…` while testing) |
+   | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook |
+   | `STRIPE_PRICE_PASS`, `STRIPE_PRICE_YEARLY` | the two price ids |
+   | `APP_URL` | `https://<your-domain>` (checkout returns here) |
+   | `ANTHROPIC_API_KEY` | for video decks |
+   | `TRANSCRIPT_MCP_URL`, `TRANSCRIPT_MCP_TOKEN` | optional, see above |
+   | `DECK_EFFORT` | optional, default `high` |
+
+4. Put the prices in `OFFERS` in [`src/config.js`](src/config.js) so the
+   upgrade sheet shows them.
+
+Server tests run with fakes, no keys needed (`tests/api.test.mjs`).
+`npm install` is only needed to deploy or to run the functions locally
+(`vercel dev`). The app itself still needs no install.
 
 ## Backups — read this on iPhone
 
@@ -247,5 +314,9 @@ or reinstalling, and **Restore from a backup** afterwards or on a new phone.
 
 ## Data & privacy
 
-Everything is stored locally in the browser (IndexedDB + `localStorage`). Nothing
-leaves the device. Clearing site data or deleting the PWA wipes it.
+Decks, progress and settings are stored locally in the browser (IndexedDB +
+`localStorage`). Clearing site data or deleting the PWA wipes them. Without an
+account nothing leaves the device. When accounts are set up and you sign in:
+your email and plan are stored in Firebase, payments go through Stripe, and a
+video you turn into a deck has its link and transcript sent to the server and
+on to Anthropic's API to build the deck.

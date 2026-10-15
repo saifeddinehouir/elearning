@@ -1,6 +1,6 @@
 // DailyQCM service worker — offline app shell + notification click handling.
 // Bump CACHE whenever shell files change.
-const CACHE = "dailyqcm-v12";
+const CACHE = "dailyqcm-v13";
 
 const SHELL = [
   ".",
@@ -35,6 +35,8 @@ const SHELL = [
   "src/library.js",
   "src/plan.js",
   "src/interview.js",
+  "src/config.js",
+  "src/account.js",
   "samples/course.json",
   "samples/leetcode.json",
   "library/devops/index.json",
@@ -74,6 +76,7 @@ const SHELL = [
   "src/views/challenge.js",
   "src/views/paywall.js",
   "src/views/interview.js",
+  "src/views/video-import.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -116,6 +119,8 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Account and payment answers must never come from the offline cache.
+  if (url.pathname.includes("/api/")) return;
 
   event.respondWith(networkFirst(request));
 });

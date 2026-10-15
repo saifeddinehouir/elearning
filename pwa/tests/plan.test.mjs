@@ -37,3 +37,15 @@ test("only live Pro features are usable, and only on Pro", () => {
   if (soon) assert.ok(!hasFeature("pro", soon.id));
   assert.ok(!hasFeature("pro", "no-such-feature"));
 });
+
+test("a server-confirmed plan counts, unless a preview override says otherwise", async () => {
+  const { entitledFrom } = await import("../src/plan.js");
+  const now = 1_000_000;
+  assert.equal(effectivePlan(null, true, true), "pro");
+  assert.equal(effectivePlan("free", true, true), "free");
+  assert.ok(entitledFrom({ plan: "pro", subscription: true }, now));
+  assert.ok(entitledFrom({ plan: "pro", proUntil: now + 1 }, now));
+  assert.ok(!entitledFrom({ plan: "pro", proUntil: now - 1 }, now));
+  assert.ok(!entitledFrom({ plan: "free", subscription: false }, now));
+  assert.ok(!entitledFrom(null, now));
+});

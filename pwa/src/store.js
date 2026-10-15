@@ -16,7 +16,7 @@ import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./s
 import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 import { libraryByKey, libraryKeyFor } from "./library.js";
-import { effectivePlan, isPlan, canInstallPath, libraryEntriesFor } from "./plan.js";
+import { effectivePlan, entitledFrom, isPlan, canInstallPath, libraryEntriesFor } from "./plan.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -69,7 +69,27 @@ export function getPlanOverride() {
   }
 }
 
-export const getPlan = () => effectivePlan(getPlanOverride());
+export const getPlan = () => effectivePlan(getPlanOverride(), undefined, entitledFrom(getEntitlement()));
+
+// The signed-in account's plan as /api/me last reported it (see account.js),
+// cached so the app knows it's Pro offline. null when signed out.
+const ENTITLEMENT_KEY = "dailyqcm.entitlement";
+
+export function getEntitlement() {
+  try {
+    return JSON.parse(localStorage.getItem(ENTITLEMENT_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+export function setEntitlement(value) {
+  try {
+    if (value) localStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(value));
+    else localStorage.removeItem(ENTITLEMENT_KEY);
+  } catch {}
+  emit();
+}
 
 export function setPlanOverride(plan) {
   try {

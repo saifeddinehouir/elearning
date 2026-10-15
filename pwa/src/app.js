@@ -1,5 +1,6 @@
-import { h, clear, closeOverlay, ICONS } from "./dom.js";
+import { h, clear, closeOverlay, toast, ICONS } from "./dom.js";
 import { onChange, getSettings, requestPersistentStorage, renameBuiltinPaths } from "./store.js";
+import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement, currentUser } from "./account.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 
@@ -141,3 +142,33 @@ applyTheme();
 render();
 requestPersistentStorage();
 renameBuiltinPaths().catch((err) => console.error(err));
+
+// Accounts are off until src/config.js has a Firebase config.
+if (accountsConfigured()) {
+  onAccountChange(render);
+  startAccounts().catch((err) => console.error(err));
+  handleCheckoutReturn();
+}
+
+// Back from Stripe Checkout (?checkout=success|cancel). The webhook that
+// grants Pro can land a few seconds after the redirect, so check a few times.
+function handleCheckoutReturn() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get("checkout");
+  if (!result) return;
+  params.delete("checkout");
+  const query = params.toString();
+  history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+  if (result !== "success") return toast("Checkout cancelled. Nothing was charged.", 3000);
+  toast("Payment received. Unlocking Pro…", 3000);
+  const stop = onAccountChange(async () => {
+    if (!currentUser()) return;
+    stop();
+    for (let i = 0; i < 6; i++) {
+      const me = await refreshEntitlement().catch(() => null);
+      if (me?.plan === "pro") return toast("You're on Pro. Thank you!", 3500);
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+    toast("Pro is taking longer than usual to unlock. Reopen the app in a minute.", 5000);
+  });
+}
