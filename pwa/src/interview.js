@@ -1,5 +1,7 @@
 // Interview date mode. Pure logic over the question shape composeSession()
-// uses: { id, topic, reviewState?, attempts? }.
+// uses: { id, topic, reviewState?, attempts? }. An interview is stored in
+// settings as { date, setOn, deckIds? }: day starts in ms, and the decks to
+// focus on (missing = whatever is in the daily mix).
 //
 // Nothing here is stored. Setting a date only changes how today's queue is
 // built, so removing it puts everything back on the normal SM-2 schedule:
@@ -66,6 +68,26 @@ export function withInterviewDue(pool, interviewDate, now = Date.now()) {
   });
 }
 
+// Days that still take new questions, today included.
+export const learningDays = (interview, now = Date.now()) => daysLeft(interview.date, now) - reserveDays(interview);
+
+// New questions a day needed to see `unseen` questions in time (0 once only
+// review days are left).
+export function paceFor(unseen, interview, now = Date.now()) {
+  const days = learningDays(interview, now);
+  return days > 0 ? Math.ceil(unseen / days) : 0;
+}
+
+// The decks the interview focuses on, limited to ones that still exist, or
+// null for "whatever is in the daily mix" (also when none are left).
+export function focusDeckIds(interview, existingIds) {
+  const ids = Array.isArray(interview?.deckIds) ? interview.deckIds : null;
+  if (!ids) return null;
+  const have = new Set(existingIds);
+  const kept = ids.filter((id) => have.has(id));
+  return kept.length ? kept : null;
+}
+
 const firstAttemptToday = (q, now) => {
   const dates = (q.attempts || []).map((a) => a.date);
   return dates.length > 0 && dayDiff(Math.min(...dates), now) === 0;
@@ -86,12 +108,10 @@ export function planToday(pool, interview, dailyGoal, now = Date.now()) {
   const introducedToday = pool.filter((q) => isSeen(q) && firstAttemptToday(q, now)).length;
   const dueToday = pool.filter((q) => isSeen(q) && q.reviewState.dueDate < endOfToday).length;
 
-  // Days that still take new questions, today included.
-  const learningDays = left - reserveDays(interview);
-  const reviewOnly = learningDays <= 0;
+  const reviewOnly = learningDays(interview, now) <= 0;
   // Pace from the start of today, so finishing today's share doesn't make
   // the next render ask for more.
-  const newPerDay = reviewOnly ? 0 : Math.ceil((unseen + introducedToday) / learningDays);
+  const newPerDay = paceFor(unseen + introducedToday, interview, now);
   const newToday = Math.max(0, newPerDay - introducedToday);
 
   const needed = dueToday + newToday;

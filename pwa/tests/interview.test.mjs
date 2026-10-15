@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { daysLeft, isActive, reserveDays, effectiveDue, withInterviewDue, planToday, readiness, MAX_SESSION } from "../src/interview.js";
+import { daysLeft, isActive, reserveDays, effectiveDue, withInterviewDue, planToday, readiness, MAX_SESSION, paceFor, focusDeckIds } from "../src/interview.js";
 import { composeSession } from "../src/session.js";
 import { addDays, startOfDay } from "../src/format.js";
 
@@ -127,4 +127,19 @@ test("readiness counts latest-correct questions, weakest topic first", () => {
   assert.equal(r.total, 5);
   assert.deepEqual(r.topics.map((t) => [t.topic, t.ready, t.total]), [["Graphs", 0, 2], ["Arrays", 2, 3]]);
   assert.equal(readiness([]).rate, 0);
+});
+
+test("pace spreads unseen questions over the learning days only", () => {
+  const iv = { date: day(10), setOn: day(0) }; // 2 reserved → 8 learning days
+  assert.equal(paceFor(80, iv, NOW), 10);
+  assert.equal(paceFor(81, iv, NOW), 11);
+  assert.equal(paceFor(0, iv, NOW), 0);
+  assert.equal(paceFor(50, { date: day(2), setOn: day(-12) }, NOW), 0);
+});
+
+test("focus keeps chosen decks that still exist, else falls back to the mix", () => {
+  assert.equal(focusDeckIds({ date: day(5) }, ["a", "b"]), null);
+  assert.deepEqual(focusDeckIds({ date: day(5), deckIds: ["a", "gone"] }, ["a", "b"]), ["a"]);
+  assert.equal(focusDeckIds({ date: day(5), deckIds: ["gone"] }, ["a"]), null);
+  assert.equal(focusDeckIds(null, ["a"]), null);
 });

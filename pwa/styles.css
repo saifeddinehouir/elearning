@@ -339,6 +339,9 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .list-row .stepper button:active { background: var(--ink); color: var(--bg); }
 .list-row .stepper strong { min-width: 24px; text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+.list-row input.check { width: 20px; height: 20px; flex: none; accent-color: var(--accent); margin: 0; }
+.list-row.group-row { cursor: pointer; }
+.list-row.group-row .label { font-weight: 600; }
 .list-footnote { padding: 8px 0 4px; font-size: 0.76rem; color: var(--ink-3); line-height: 1.5; }
 
 /* ---------- Segmented control ---------- */

@@ -1,7 +1,9 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getSettings, setSettings, getPlan } from "../store.js";
+import { getSettings, setSettings, getPlan, getDecksPool, listDecks } from "../store.js";
 import { hasFeature } from "../plan.js";
-import { isActive, daysLeft, withInterviewDue, planToday, readiness } from "../interview.js";
+import { isActive, daysLeft, withInterviewDue, planToday, readiness, focusDeckIds, paceFor, MAX_SESSION } from "../interview.js";
+import { LIBRARIES, libraryOfDeck } from "../library.js";
+import { PATHS, pathOfPattern } from "../patterns.js";
 import { startOfDay, addDays, fmtDateFull, pct } from "../format.js";
 import { ring, horizontalBars } from "../charts.js";
 import { openPaywall, proBadge } from "./paywall.js";
@@ -15,15 +17,17 @@ export function activeInterview(settings = getSettings()) {
   return iv && available() && isActive(iv.date) ? iv : null;
 }
 
-// What Today studies: the daily pool with interview dates applied, and the
-// session config that follows today's plan. Falls back to the normal setup.
-export function dailySetup(pool, settings = getSettings()) {
+// What Today studies: the daily mix (or the interview's chosen decks) with
+// interview dates applied, and the session config that follows today's plan.
+// Falls back to the normal setup when no interview is in force.
+export async function todaySetup(dailyPool, decks, settings = getSettings()) {
   const base = { size: settings.dailyGoal, newLimitRatio: settings.newLimitRatio };
   const iv = activeInterview(settings);
-  if (!iv) return { pool, config: base, plan: null, interview: null };
-  const planned = withInterviewDue(pool, iv.date);
-  const plan = planToday(planned, iv, settings.dailyGoal);
-  return { pool: planned, config: { ...base, size: plan.size, newLimit: plan.newToday }, plan, interview: iv };
+  if (!iv) return { pool: dailyPool, config: base, plan: null, interview: null, focus: null };
+  const focus = focusDeckIds(iv, decks.map((d) => d.id));
+  const pool = withInterviewDue(focus ? await getDecksPool(focus) : dailyPool, iv.date);
+  const plan = planToday(pool, iv, settings.dailyGoal);
+  return { pool, config: { ...base, size: plan.size, newLimit: plan.newToday }, plan, interview: iv, focus };
 }
 
 const whenText = (left) => (left === 0 ? "Today" : left === 1 ? "Tomorrow" : `${left} days`);
@@ -103,7 +107,7 @@ export function interviewCard(pool, setup) {
       h(
         "div",
         { class: "spacer" },
-        h("div", { class: "kicker" }, `Interview · ${fmtDateFull(iv.date)}`),
+        h("div", { class: "kicker" }, `Interview · ${fmtDateFull(iv.date)}${setup.focus ? ` · ${setup.focus.length} deck${setup.focus.length === 1 ? "" : "s"}` : ""}`),
         h("div", { class: "promo-title" }, whenText(plan.daysLeft)),
         h("div", { class: "small muted", style: "margin-top:6px" }, todayLine),
         paceLine ? h("div", { class: "small muted", style: "margin-top:2px" }, paceLine) : null,
@@ -139,11 +143,35 @@ const fromInputValue = (v) => {
   return y && m && d ? new Date(y, m - 1, d).getTime() : null;
 };
 
-export function openInterviewSheet() {
+// Decks grouped the way the Decks tab shows them: your own, then each
+// library, then each pattern path, each in study order.
+function deckGroups(decks) {
+  const inOrder = (list) => [...list].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const groups = [];
+  const own = decks.filter((d) => !d.libraryKey && !d.builtinKey);
+  if (own.length) groups.push({ name: "Your decks", decks: inOrder(own) });
+  for (const lib of LIBRARIES) {
+    const g = decks.filter((d) => libraryOfDeck(d) === lib);
+    if (g.length) groups.push({ name: lib.name, decks: inOrder(g) });
+  }
+  for (const path of PATHS) {
+    const g = decks.filter((d) => d.builtinKey && pathOfPattern.get(d.builtinKey) === path);
+    if (g.length) groups.push({ name: path.name, decks: inOrder(g) });
+  }
+  return groups;
+}
+
+const unseenIn = (decks) => decks.reduce((n, d) => n + Math.round(d.questionCount * (1 - d.studiedFraction)), 0);
+
+export async function openInterviewSheet() {
   if (!available()) return openPaywall("Interview date mode");
+  const decks = await listDecks();
   openOverlay((close) => {
     const iv = getSettings().interview;
     const today = startOfDay().getTime();
+    // Moving the date keeps the original notice, so the reserved review days
+    // don't shrink just because it was edited.
+    const setOn = iv && isActive(iv.date) ? Math.min(iv.setOn, today) : today;
     const overlay = h("div", { class: "overlay" });
     const head = h("div", { class: "o-head" });
     const body = h("div", { class: "o-body" });
@@ -154,15 +182,105 @@ export function openInterviewSheet() {
       type: "date",
       min: toInputValue(today),
       value: toInputValue(iv && iv.date >= today ? iv.date : addDays(today, 14).getTime()),
+      onchange: () => paint(),
     });
     body.appendChild(h("div", { class: "list", style: "padding:12px 16px" }, input));
+
+    // ---------- What to study ----------
+    const focus = iv ? focusDeckIds(iv, decks.map((d) => d.id)) : null;
+    let mode = focus ? "choose" : "mix";
+    const selected = new Set(focus || decks.filter((d) => d.includeInMix !== false).map((d) => d.id));
+    const chosenDecks = () => (mode === "mix" ? decks.filter((d) => d.includeInMix !== false) : decks.filter((d) => selected.has(d.id)));
+
+    body.appendChild(h("div", { class: "section-header" }, "What to study"));
+    const modeWrap = h("div", { class: "list", style: "padding:12px 16px" });
+    const modeControl = h("div", { class: "segmented" });
+    const modeButtons = [
+      ["mix", "My daily mix"],
+      ["choose", "Choose decks"],
+    ].map(([val, label]) => {
+      const b = h("button", { onclick: () => { mode = val; paint(); } }, label);
+      b.dataset.val = val;
+      modeControl.appendChild(b);
+      return b;
+    });
+    modeWrap.appendChild(modeControl);
+    body.appendChild(modeWrap);
+
+    const picker = h("div", {});
+    const groupBoxes = [];
+    const boxById = new Map();
+    for (const g of deckGroups(decks)) {
+      const groupBox = h("input", {
+        type: "checkbox",
+        class: "check",
+        onchange: (e) => {
+          for (const d of g.decks) e.target.checked ? selected.add(d.id) : selected.delete(d.id);
+          paint();
+        },
+      });
+      groupBoxes.push({ box: groupBox, decks: g.decks });
+      picker.appendChild(
+        h("label", { class: "list-row inset group-row" }, groupBox, h("span", { class: "label" }, g.name, h("span", { class: "sub" }, `${g.decks.length} deck${g.decks.length === 1 ? "" : "s"}`)))
+      );
+      const list = h("div", { class: "list" });
+      for (const d of g.decks) {
+        const box = h("input", {
+          type: "checkbox",
+          class: "check",
+          checked: selected.has(d.id),
+          onchange: (e) => {
+            e.target.checked ? selected.add(d.id) : selected.delete(d.id);
+            paint();
+          },
+        });
+        boxById.set(d.id, box);
+        list.appendChild(
+          h(
+            "label",
+            { class: "list-row inset" },
+            box,
+            h("span", { class: "label" }, d.name, h("span", { class: "sub" }, `${d.questionCount} questions · ${pct(d.studiedFraction)} seen`))
+          )
+        );
+      }
+      picker.appendChild(list);
+    }
+    body.appendChild(picker);
+
+    const summary = h("p", { class: "small", style: "margin:12px 0 0" });
+    body.appendChild(summary);
     body.appendChild(
       h(
         "p",
         { class: "list-footnote" },
-        "Until then, reviews that would fall after the interview are brought forward, unseen questions are spread over the days left, and the final day or two are kept for review. It counts the decks in your daily mix. Remove the date and everything goes back to normal."
+        "Until the interview, Today studies only these decks. Reviews that would fall after it are brought forward, unseen questions are spread over the days left, and the final day or two are kept for review. Other decks pause until then. Remove the date and everything goes back to normal."
       )
     );
+
+    function paint() {
+      for (const b of modeButtons) b.classList.toggle("active", b.dataset.val === mode);
+      picker.style.display = mode === "choose" ? "" : "none";
+      for (const [id, box] of boxById) box.checked = selected.has(id);
+      for (const { box, decks: g } of groupBoxes) {
+        const n = g.filter((d) => selected.has(d.id)).length;
+        box.checked = n === g.length;
+        box.indeterminate = n > 0 && n < g.length;
+      }
+      const chosen = chosenDecks();
+      const questions = chosen.reduce((n, d) => n + d.questionCount, 0);
+      const unseen = unseenIn(chosen);
+      const date = fromInputValue(input.value);
+      const pace = date !== null && date >= today ? paceFor(unseen, { date, setOn }) : 0;
+      summary.textContent = chosen.length === 0
+        ? "Pick at least one deck."
+        : `${chosen.length} deck${chosen.length === 1 ? "" : "s"} · ${questions} questions · ${unseen} not seen yet` +
+          (unseen > 0 && pace > 0 ? ` · about ${pace} new a day` : "");
+      summary.style.color = pace > MAX_SESSION ? "var(--bad)" : "";
+      if (pace > MAX_SESSION) summary.textContent += `. That's more than a day's session can hold (${MAX_SESSION}), so narrow it down or pick a later date.`;
+    }
+    paint();
+
     body.appendChild(
       h(
         "button",
@@ -171,10 +289,10 @@ export function openInterviewSheet() {
           onclick: () => {
             const date = fromInputValue(input.value);
             if (date === null || date < today) return toast("Pick today or a later date");
-            // Moving the date keeps the original notice, so the reserved
-            // review days don't shrink just because it was edited.
-            const setOn = iv && isActive(iv.date) ? Math.min(iv.setOn, today) : today;
-            setSettings({ interview: { date, setOn } });
+            if (chosenDecks().length === 0) return toast("Pick at least one deck");
+            const next = { date, setOn };
+            if (mode === "choose") next.deckIds = [...selected].filter((id) => decks.some((d) => d.id === id));
+            setSettings({ interview: next });
             toast(`Planning for ${fmtDateFull(date)}`);
             close();
           },

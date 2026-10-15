@@ -12,7 +12,7 @@ import { installAndOpenPath, installAndOpenLibrary, openRoadmapDetail, pathPromo
 import { LIBRARIES } from "../library.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
-import { dailySetup, interviewCard } from "./interview.js";
+import { todaySetup, interviewCard } from "./interview.js";
 
 export async function renderDaily() {
   const [allPool, studyDays, decks, installedPaths] = await Promise.all([
@@ -22,9 +22,9 @@ export async function renderDaily() {
     getPatternPaths(),
   ]);
   const settings = getSettings();
-  // With an interview date set, the pool's review dates and the session size
-  // follow the interview plan instead of the plain settings.
-  const setup = dailySetup(allPool, settings);
+  // With an interview date set, what's studied, the review dates and the
+  // session size follow the interview plan instead of the plain settings.
+  const setup = await todaySetup(allPool, decks, settings);
   const { pool, config } = setup;
 
   const wrap = h("div", {});

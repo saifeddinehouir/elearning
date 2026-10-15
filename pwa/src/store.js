@@ -236,6 +236,10 @@ async function buildPool(filterFn) {
 
 export const getDailyPool = () => buildPool((d) => d.includeInMix !== false);
 export const getDeckPool = (deckId) => buildPool((d) => d.id === deckId);
+export const getDecksPool = (deckIds) => {
+  const ids = new Set(deckIds);
+  return buildPool((d) => ids.has(d.id));
+};
 export const getAllQuestionsFlat = () => buildPool(() => true);
 
 export const getAllAttempts = () => dbGetAll(STORES.attempts);

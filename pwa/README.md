@@ -195,8 +195,10 @@ name is adopted with its progress.
 ## Interview date mode
 
 **Today → Interview coming up?** (or **Settings → Interview date**) sets the
-day. Until then, Today's session follows a plan over the decks in your daily
-mix. Logic: [`src/interview.js`](src/interview.js).
+day and what to study: everything in your daily mix, or decks you pick (the
+sheet shows the questions involved and the new-per-day pace as you choose).
+Until then, Today studies only those decks and follows a plan; other decks
+pause. Logic: [`src/interview.js`](src/interview.js).
 
 - **Reviews land before the interview.** A review whose SM-2 date falls on or
   after the interview counts as due in the last 3 days before it, spread by
