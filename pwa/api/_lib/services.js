@@ -46,18 +46,25 @@ async function admin() {
   if (firebase) return firebase;
   const { account, problem } = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
   if (problem) throw setupError(problem);
-  const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-  const { getAuth } = await import("firebase-admin/auth");
-  const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
-  let app;
+  // Each step is named so a failure on the server says where it happened
+  // (with the error's code, never its message) without needing the logs.
+  let step = "load_sdk";
   try {
-    app = getApps()[0] || initializeApp({ credential: cert(account) });
+    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+    const { getAuth } = await import("firebase-admin/auth");
+    const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+    step = "credential";
+    const app = getApps()[0] || initializeApp({ credential: cert(account) });
+    step = "auth";
+    const auth = getAuth(app);
+    step = "firestore";
+    firebase = { auth, db: getFirestore(app), FieldValue };
+    return firebase;
   } catch (err) {
-    console.error("Firebase Admin init failed", err.code || err.name);
-    throw setupError("service_account_rejected");
+    console.error(`Firebase Admin failed at ${step}`, err);
+    if (step === "credential") throw setupError("service_account_rejected");
+    throw new HttpError(503, `firebase_${step}_failed`, `Firebase setup failed at ${step} (${err?.code || err?.name || "error"}).`);
   }
-  firebase = { auth: getAuth(app), db: getFirestore(app), FieldValue };
-  return firebase;
 }
 
 let stripeClient = null;
