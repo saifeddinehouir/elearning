@@ -267,3 +267,16 @@ test("me: reports the plan; wrong methods are rejected", async () => {
   assert.equal((await meHandler(deps)(post({}, "u1", "me"))).status, 405);
   assert.equal((await meHandler(deps)(new Request("https://app.test/api/me", { headers: { authorization: "Bearer bad" } }))).status, 401);
 });
+
+test("service-account setup problems are named, never echoed", async () => {
+  const { parseServiceAccount } = await import("../api/_lib/services.js");
+  assert.equal(parseServiceAccount("").problem, "not_configured");
+  assert.equal(parseServiceAccount("{oops").problem, "service_account_not_json");
+  assert.equal(parseServiceAccount('{"apiKey":"x"}').problem, "service_account_wrong_file");
+  assert.equal(parseServiceAccount('{"type":"service_account","project_id":"p"}').problem, "service_account_incomplete");
+  const ok = parseServiceAccount(JSON.stringify({ type: "service_account", project_id: "p", client_email: "e", private_key: "-----BEGIN-----\nabc\n-----END-----" }));
+  assert.equal(ok.problem, undefined);
+  assert.deepEqual(ok.account, { projectId: "p", clientEmail: "e", privateKey: "-----BEGIN-----\nabc\n-----END-----" });
+  // Leading/trailing whitespace from a paste is fine.
+  assert.ok(parseServiceAccount(`  ${JSON.stringify({ type: "service_account", project_id: "p", client_email: "e", private_key: "k" })}\n`).account);
+});

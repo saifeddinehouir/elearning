@@ -13,15 +13,49 @@
 
 import { HttpError } from "./http.js";
 
+// Reads FIREBASE_SERVICE_ACCOUNT into the fields cert() needs, or names
+// what's wrong with it. Pure; the messages never include the key itself.
+export function parseServiceAccount(raw) {
+  if (!raw || !String(raw).trim()) return { problem: "not_configured" };
+  let sa;
+  try {
+    sa = JSON.parse(String(raw).trim());
+  } catch {
+    return { problem: "service_account_not_json" };
+  }
+  if (!sa || typeof sa !== "object") return { problem: "service_account_not_json" };
+  if (sa.type !== "service_account") return { problem: "service_account_wrong_file" };
+  if (!sa.project_id || !sa.client_email || !sa.private_key) return { problem: "service_account_incomplete" };
+  // A key pasted through some editors arrives with literal "\n" pairs
+  // instead of newlines; the PEM parser needs real ones.
+  const privateKey = String(sa.private_key).includes("\\n") ? String(sa.private_key).replace(/\\n/g, "\n") : sa.private_key;
+  return { account: { projectId: sa.project_id, clientEmail: sa.client_email, privateKey } };
+}
+
+const SETUP_PROBLEMS = {
+  not_configured: "Accounts aren't set up on this server yet.",
+  service_account_not_json: "FIREBASE_SERVICE_ACCOUNT isn't valid JSON. Paste the whole downloaded key file.",
+  service_account_wrong_file: "FIREBASE_SERVICE_ACCOUNT isn't a service-account key (Project settings → Service accounts → Generate new private key).",
+  service_account_incomplete: "FIREBASE_SERVICE_ACCOUNT is missing project_id, client_email or private_key.",
+  service_account_rejected: "Firebase rejected FIREBASE_SERVICE_ACCOUNT's private key.",
+};
+const setupError = (code) => new HttpError(503, code, SETUP_PROBLEMS[code]);
+
 let firebase = null;
 async function admin() {
   if (firebase) return firebase;
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) throw new HttpError(503, "not_configured", "Accounts aren't set up on this server yet.");
+  const { account, problem } = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
+  if (problem) throw setupError(problem);
   const { initializeApp, getApps, cert } = await import("firebase-admin/app");
   const { getAuth } = await import("firebase-admin/auth");
   const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
-  const app = getApps()[0] || initializeApp({ credential: cert(JSON.parse(raw)) });
+  let app;
+  try {
+    app = getApps()[0] || initializeApp({ credential: cert(account) });
+  } catch (err) {
+    console.error("Firebase Admin init failed", err.code || err.name);
+    throw setupError("service_account_rejected");
+  }
   firebase = { auth: getAuth(app), db: getFirestore(app), FieldValue };
   return firebase;
 }
