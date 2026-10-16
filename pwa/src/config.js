@@ -6,14 +6,16 @@
 // While FIREBASE_CONFIG is null the app runs exactly as before: no sign-in,
 // no checkout, no video import.
 
-export const FIREBASE_CONFIG = null;
-// Example, from Firebase console → Project settings → Your apps → Web app:
-// export const FIREBASE_CONFIG = {
-//   apiKey: "AIza...",
-//   authDomain: "your-project.firebaseapp.com",
-//   projectId: "your-project",
-//   appId: "1:123:web:abc",
-// };
+// From Firebase console → Project settings → Your apps → Web app. Analytics
+// isn't loaded, so its measurementId is left out.
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDXoh0Glpr4-1iftGby2Zfui0yq4Q1uDnw",
+  authDomain: "dailyqcm.firebaseapp.com",
+  projectId: "dailyqcm",
+  storageBucket: "dailyqcm.firebasestorage.app",
+  messagingSenderId: "149091227880",
+  appId: "1:149091227880:web:d21b6f6d76bfb3e38fd15d",
+};
 
 // Where the /api functions live. Empty = same origin (the app and the API are
 // both deployed on Vercel).
