@@ -3,7 +3,7 @@
 // takes these as `deps`; tests pass fakes with the same shape.
 //
 // Environment (set in the Vercel project):
-//   FIREBASE_SERVICE_ACCOUNT  service-account JSON (one line)
+//   FIREBASE_SERVICE_ACCOUNT  service-account JSON (the downloaded key file)
 //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 //   STRIPE_PRICE_PASS, STRIPE_PRICE_YEARLY   Stripe price ids
 //   APP_URL                   e.g. https://dailyqcm.vercel.app (checkout returns here)
@@ -12,6 +12,7 @@
 //   DECK_EFFORT               optional, default "high"
 
 import { HttpError } from "./http.js";
+import { createTokenVerifier } from "./firebase-token.js";
 
 // Reads FIREBASE_SERVICE_ACCOUNT into the fields cert() needs, or names
 // what's wrong with it. Pure; the messages never include the key itself.
@@ -41,6 +42,17 @@ const SETUP_PROBLEMS = {
 };
 const setupError = (code) => new HttpError(503, code, SETUP_PROBLEMS[code]);
 
+// Sign-in tokens are checked with jose against Google's public keys (see
+// firebase-token.js); only Firestore goes through firebase-admin.
+let verifier = null;
+function tokenVerifier() {
+  if (verifier) return verifier;
+  const { account, problem } = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
+  if (problem) throw setupError(problem);
+  verifier = createTokenVerifier(account.projectId);
+  return verifier;
+}
+
 let firebase = null;
 async function admin() {
   if (firebase) return firebase;
@@ -51,14 +63,11 @@ async function admin() {
   let step = "load_sdk";
   try {
     const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-    const { getAuth } = await import("firebase-admin/auth");
     const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
     step = "credential";
     const app = getApps()[0] || initializeApp({ credential: cert(account) });
-    step = "auth";
-    const auth = getAuth(app);
     step = "firestore";
-    firebase = { auth, db: getFirestore(app), FieldValue };
+    firebase = { db: getFirestore(app), FieldValue };
     return firebase;
   } catch (err) {
     console.error(`Firebase Admin failed at ${step}`, err);
@@ -90,10 +99,9 @@ export function realDeps() {
     now: () => Date.now(),
 
     async verifyIdToken(token) {
-      const { auth } = await admin();
+      const verify = tokenVerifier();
       try {
-        const t = await auth.verifyIdToken(token);
-        return { uid: t.uid, email: t.email || null };
+        return await verify(token);
       } catch {
         throw new HttpError(401, "signed_out", "Your sign-in expired. Sign in again.");
       }

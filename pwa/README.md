@@ -12,12 +12,14 @@ stats.
 
 ## Run it locally (Windows / Mac / Linux)
 
-Needs Node 18+ (for the dev server and tests). No `npm install` — there are no deps.
+Needs Node 18+. The app has no dependencies and no build; `npm install` is
+only for the server functions and their tests.
 
 ```bash
 cd quiz_qpp/pwa
 npm run serve      # -> http://localhost:5173
-npm test           # SM-2 / session builder / streak / schema unit tests
+npm install        # once, for the tests and the /api functions
+npm test           # unit tests: SM-2, sessions, plans, interview mode, server
 ```
 
 Open `http://localhost:5173` in Chrome or Edge. In DevTools → Application you can
@@ -301,9 +303,14 @@ generation doesn't count toward the monthly 30.
 4. Put the prices in `OFFERS` in [`src/config.js`](src/config.js) so the
    upgrade sheet shows them.
 
-Server tests run with fakes, no keys needed (`tests/api.test.mjs`).
-`npm install` is only needed to deploy or to run the functions locally
-(`vercel dev`). The app itself still needs no install.
+Server tests run with fakes, no keys needed (`tests/api.test.mjs`); the
+sign-in token test needs `npm install` once (it uses `jose`). The app itself
+still needs no install or build.
+
+Sign-in tokens are verified with `jose` against Google's public keys
+([`api/_lib/firebase-token.js`](api/_lib/firebase-token.js)) rather than
+`firebase-admin/auth`, which fails to load on Vercel (`ERR_REQUIRE_ESM`
+from its `jwks-rsa` dependency). Firestore still uses `firebase-admin`.
 
 ## Backups — read this on iPhone
 

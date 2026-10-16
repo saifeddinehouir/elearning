@@ -33,7 +33,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Unit tests (pure logic)
+      - name: Install server dependencies (tests use jose)
+        working-directory: pwa
+        run: npm ci
+      - name: Unit tests
         working-directory: pwa
         run: node --test
 
