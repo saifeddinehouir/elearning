@@ -221,6 +221,8 @@ h1, h2, h3 { text-wrap: balance; }
 
 /* Pro: accent rule, same weight as the hard path's. */
 .card.pro { border-top: 2px solid var(--accent); }
+.card.soon { border-top-style: dashed; }
+.card.soon .kicker { color: var(--accent); }
 .card.pro .kicker { color: var(--accent); }
 
 /* ---------- Figures (the "ring" helper renders a numeral + meter) ---------- */

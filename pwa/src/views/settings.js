@@ -1,10 +1,10 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride, getEntitlement, previewAllowed } from "../store.js";
-import { accountsConfigured, currentUser, signIn, signOut, onAccountChange } from "../account.js";
+import { accountsConfigured, currentUser, signIn, signOut, onAccountChange, updateName } from "../account.js";
 import { isPro } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
 import { openInterviewSheet } from "./interview.js";
-import { fmtDateFull } from "../format.js";
+import { fmtDateFull, firstName } from "../format.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
 export function openSettings() {
@@ -221,6 +221,28 @@ export function openSettings() {
               "Sign out"
             )
           )
+        );
+        // The name Today greets you by.
+        const nameInput = h("input", {
+          type: "text",
+          value: u.name || "",
+          placeholder: "Add your name",
+          autocomplete: "given-name",
+          disabled: !!u.offline,
+          style: "width:auto;flex:1;min-width:0;background:none;border:none;padding:0;text-align:right",
+          onchange: async (e) => {
+            const value = e.target.value.trim();
+            if (value === (u.name || "")) return;
+            try {
+              await updateName(value);
+              toast(value ? `Hi, ${firstName(value)}!` : "Name removed");
+            } catch (err) {
+              toast(err.message || "Couldn't save your name", 3000);
+            }
+          },
+        });
+        accountList.appendChild(
+          h("label", { class: "list-row inset" }, h("span", { class: "icon-chip c-purple", html: ICONS.pencil }), h("span", { class: "label" }, "Name"), nameInput)
         );
       };
       paintAccount();

@@ -20,7 +20,7 @@ import { openCheatSheet } from "./guide.js";
 import { ring } from "../charts.js";
 import { LIBRARIES, libraryByKey, missingEntries } from "../library.js";
 import { installLibrary, getLibraryIndex, getPlan, ProRequiredError } from "../store.js";
-import { canInstallPath, isPro, FREE_LIBRARY_DECKS } from "../plan.js";
+import { canInstallPath, isPro, FREE_LIBRARY_DECKS, PRO_FEATURES } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
 
 // Installs (or repairs) a built-in deck library and opens its roadmap.
@@ -53,6 +53,19 @@ export function libraryPromoCard(lib = LIBRARIES[0]) {
       h("span", {}, isPro(getPlan()) ? "all open" : `${FREE_LIBRARY_DECKS} decks free`)
     ),
     h("button", { class: "btn primary block", onclick: () => installAndOpenLibrary(lib.key) }, `Add ${lib.name}`)
+  );
+}
+
+// Teaser for company-specific prep, announced before it exists (the Pro
+// sheet lists it as "Soon"). Not tappable: there's nothing to open yet.
+function comingSoonCard() {
+  const company = PRO_FEATURES.find((f) => f.id === "company-prep");
+  return h(
+    "div",
+    { class: "card promo soon" },
+    h("div", { class: "kicker" }, "Coming soon", proBadge()),
+    h("div", { class: "promo-title" }, "Company interview prep"),
+    h("p", { class: "small muted", style: "margin:4px 0 0" }, company.sub)
   );
 }
 
@@ -131,6 +144,7 @@ export async function renderRoadmaps() {
   for (const path of PATHS) {
     if (!roadmaps.some((r) => r.builtin === path.key)) wrap.appendChild(pathPromoCard(path));
   }
+  wrap.appendChild(comingSoonCard());
 
   if (roadmaps.length === 0 && decks.length === 0) {
     wrap.appendChild(

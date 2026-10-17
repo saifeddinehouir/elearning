@@ -51,3 +51,16 @@ export function fmtPrice(amount, currency, interval = null, locale = undefined) 
   const text = nf.format(amount / 10 ** digits);
   return interval ? `${text} / ${interval}` : text;
 }
+
+// "Saif Eddine Houir" → "Saif". Empty when there's no usable name.
+export function firstName(name) {
+  const first = String(name || "").trim().split(/\s+/)[0] || "";
+  return first.length > 24 ? first.slice(0, 24) : first;
+}
+
+// The Today title: time-of-day greeting, with the first name when known.
+export function greetingFor(hour, name = "") {
+  const g = hour < 5 ? "Late night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const first = firstName(name);
+  return first ? `${g}, ${first}` : g;
+}

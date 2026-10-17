@@ -48,7 +48,7 @@ export function knownAccount() {
 }
 function rememberAccount(u) {
   try {
-    if (u) localStorage.setItem(KNOWN_KEY, JSON.stringify({ uid: u.uid, email: u.email || null }));
+    if (u) localStorage.setItem(KNOWN_KEY, JSON.stringify({ uid: u.uid, email: u.email || null, name: u.displayName || null }));
     else localStorage.removeItem(KNOWN_KEY);
   } catch {}
 }
@@ -58,7 +58,7 @@ function rememberAccount(u) {
 export function currentUser() {
   if (user) return { email: user.email, name: user.displayName };
   const known = status === "signed_out" ? null : knownAccount();
-  return known ? { email: known.email, name: null, offline: true } : null;
+  return known ? { email: known.email, name: known.name || null, offline: true } : null;
 }
 export const accountStatus = () => status;
 export const accountReady = () => status !== "loading";
@@ -127,8 +127,22 @@ export async function signInWithEmail(email, password) {
 export async function createAccount(email, password, name = "") {
   const { fa, auth } = await firebase();
   const { user: u } = await fa.createUserWithEmailAndPassword(auth, email.trim(), password);
-  if (name.trim()) await fa.updateProfile(u, { displayName: name.trim() }).catch(() => {});
+  if (name.trim()) {
+    await fa.updateProfile(u, { displayName: name.trim() }).catch(() => {});
+    // The sign-in event already fired without the name; show it now.
+    rememberAccount(u);
+    notify();
+  }
   fa.sendEmailVerification(u).catch((err) => console.error(err));
+}
+
+// Sets the name the app greets you by (and shows in Settings).
+export async function updateName(name) {
+  if (!user) throw new ApiError(401, "signed_out", "Sign in first.");
+  const { fa } = await firebase();
+  await fa.updateProfile(user, { displayName: name.trim() || null });
+  rememberAccount(user);
+  notify();
 }
 
 export async function resetPassword(email) {

@@ -42,3 +42,12 @@ test("sign-in errors read as plain sentences, and typos are caught before a requ
   assert.match(checkCredentials({ email: "a@b.co", password: "12345", creating: true }), /6 characters/);
   assert.equal(checkCredentials({ email: " a@b.co ", password: "12345" }), null);
 });
+
+test("Today greets by first name when there is one", async () => {
+  const { greetingFor, firstName } = await import("../src/format.js");
+  assert.equal(greetingFor(9, "Saif Eddine Houir"), "Good morning, Saif");
+  assert.equal(greetingFor(14, "  Salma "), "Good afternoon, Salma");
+  assert.equal(greetingFor(20, null), "Good evening");
+  assert.equal(greetingFor(3, ""), "Late night");
+  assert.equal(firstName("x".repeat(40)).length, 24);
+});

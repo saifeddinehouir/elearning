@@ -12,6 +12,8 @@ import { installAndOpenPath, installAndOpenLibrary, openRoadmapDetail, pathPromo
 import { LIBRARIES } from "../library.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
+import { greetingFor } from "../format.js";
+import { currentUser } from "../account.js";
 import { todaySetup, interviewCard } from "./interview.js";
 
 export async function renderDaily() {
@@ -36,7 +38,7 @@ export async function renderDaily() {
         "div",
         {},
         h("div", { class: "kicker" }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
-        h("h1", { class: "screen-title" }, greeting())
+        h("h1", { class: "screen-title" }, greetingFor(new Date().getHours(), currentUser()?.name))
       ),
       h("button", { class: "btn icon-btn", onclick: () => openSettings(), "aria-label": "Settings", html: ICONS.gear })
     )
@@ -68,14 +70,6 @@ export async function renderDaily() {
   const notYet = PATHS.find((p) => !installedPaths.some((r) => r.builtin === p.key));
   if (notYet) wrap.appendChild(pathPromoCard(notYet, { compact: installedPaths.length > 0 }));
   return wrap;
-}
-
-function greeting() {
-  const hr = new Date().getHours();
-  if (hr < 5) return "Late night";
-  if (hr < 12) return "Good morning";
-  if (hr < 18) return "Good afternoon";
-  return "Good evening";
 }
 
 // Hero: today's count as a big numeral over its goal, then ruled rows for
