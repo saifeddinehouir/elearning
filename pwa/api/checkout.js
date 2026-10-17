@@ -32,6 +32,9 @@ export function createHandler(deps) {
     };
     if (user?.stripeCustomerId) params.customer = user.stripeCustomerId;
     else if (email) params.customer_email = email;
+    // One-off payments don't create a Stripe customer by default; without one
+    // the billing page would have no receipts to show.
+    if (def.mode === "payment" && !params.customer) params.customer_creation = "always";
     // The subscription carries the uid so later renewals and cancellations
     // find the right account.
     if (def.mode === "subscription") params.subscription_data = { metadata: { uid } };

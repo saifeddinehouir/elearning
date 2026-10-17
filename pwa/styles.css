@@ -588,6 +588,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* ---------- Today ---------- */
 .welcome { padding: 18px 0 22px; }
 .welcome-emoji { display: none; }
+/* ---------- Account ---------- */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent); font-weight: 650; letter-spacing: 0.02em;
+  width: 40px; height: 40px; font-size: 0.85rem; border: 0; cursor: pointer;
+}
+.avatar.sm { width: 36px; height: 36px; font-size: 0.78rem; }
+.avatar.lg { width: 64px; height: 64px; font-size: 1.3rem; cursor: default; }
+.account-head { display: flex; align-items: center; gap: 16px; padding: 6px 0 18px; }
+.account-head .promo-title { overflow-wrap: anywhere; }
+.row-input { width: auto; flex: 1; min-width: 0; background: none !important; border: none !important; padding: 0 !important; text-align: right; }
+
 /* ---------- Sign-in / create account ---------- */
 .signin { padding: max(6vh, calc(var(--safe-t) + 16px)) 0 24px; max-width: 460px; margin: 0 auto; }
 .signin-title { font-size: clamp(2rem, 8vw, 2.6rem); font-weight: 600; letter-spacing: -0.022em; line-height: 1; margin: 8px 0 18px; }

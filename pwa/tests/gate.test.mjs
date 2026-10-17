@@ -51,3 +51,11 @@ test("Today greets by first name when there is one", async () => {
   assert.equal(greetingFor(3, ""), "Late night");
   assert.equal(firstName("x".repeat(40)).length, 24);
 });
+
+test("the account avatar shows initials, falling back to the email", async () => {
+  const { initials } = await import("../src/format.js");
+  assert.equal(initials("Saif Eddine Houir"), "SE");
+  assert.equal(initials("salma"), "S");
+  assert.equal(initials("", "zed@x.test"), "Z");
+  assert.equal(initials(null, ""), "?");
+});

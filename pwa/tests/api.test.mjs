@@ -322,3 +322,52 @@ test("prices are formatted from Stripe's minor units", async () => {
   assert.equal(fmtPrice(500, "jpy", null, "en-US"), "¥500");
   assert.equal(fmtPrice(null, "usd"), "");
 });
+
+test("subscription events carry the plan length, renewal and cancellation dates", () => {
+  const S = Math.floor(NOW / 1000);
+  const sub = (over = {}) => ({
+    type: "customer.subscription.updated",
+    data: { object: { id: "sub_1", status: "active", customer: "cus_1", metadata: { uid: "u1" }, cancel_at_period_end: false, cancel_at: null, items: { data: [{ current_period_end: S + 30 * 86400, price: { recurring: { interval: "month" } } }] }, ...over } },
+  });
+  const renewing = patchForEvent(sub(), null, NOW);
+  assert.equal(renewing.subscriptionInterval, "month");
+  assert.equal(renewing.subscriptionRenewsAt, (S + 30 * 86400) * 1000);
+  assert.equal(renewing.subscriptionEndsAt, null);
+  assert.equal(renewing.stripeCustomerId, "cus_1");
+  const cancelled = patchForEvent(sub({ cancel_at_period_end: true }), null, NOW);
+  assert.equal(cancelled.subscriptionActive, true, "still paid up");
+  assert.equal(cancelled.subscriptionEndsAt, (S + 30 * 86400) * 1000);
+  // Older API versions put the period end on the subscription itself.
+  const old = patchForEvent(sub({ items: { data: [{}] }, current_period_end: S + 99 }), null, NOW);
+  assert.equal(old.subscriptionRenewsAt, (S + 99) * 1000);
+
+  const me = publicPlan({ ...renewing, subscriptionActive: true }, NOW);
+  assert.deepEqual([me.plan, me.interval, me.renewsAt, me.endsAt, me.billing], ["pro", "month", renewing.subscriptionRenewsAt, null, true]);
+  const ending = publicPlan({ ...cancelled }, NOW);
+  assert.equal(ending.renewsAt, null);
+  assert.equal(ending.endsAt, cancelled.subscriptionEndsAt);
+  assert.equal(publicPlan({ subscriptionActive: false, subscriptionRenewsAt: 5 }, NOW).renewsAt, null);
+});
+
+test("billing portal: opens for a Stripe customer and returns to the app", async () => {
+  const { createHandler: portalHandler } = await import("../api/billing-portal.js");
+  const portals = [];
+  const deps = fakeDeps({ async createPortal(p) { portals.push(p); return { url: "https://billing.test/p" }; } });
+  deps.users.u1.stripeCustomerId = "cus_1";
+  const res = await portalHandler(deps)(post({}, "u1", "billing-portal"));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).url, "https://billing.test/p");
+  assert.deepEqual(portals[0], { customer: "cus_1", return_url: "https://app.test/?billing=return" });
+  assert.equal((await portalHandler(deps)(post({}, "free", "billing-portal"))).status, 409);
+  assert.equal((await portalHandler(deps)(post({}, null, "billing-portal"))).status, 401);
+});
+
+test("checkout: a one-off pass creates a Stripe customer so receipts have a home", async () => {
+  const deps = fakeDeps();
+  await checkoutHandler(deps)(post({ offer: "pass" }, "free", "checkout"));
+  assert.equal(deps.calls.checkouts[0].customer_creation, "always");
+  deps.users.free.stripeCustomerId = "cus_9";
+  await checkoutHandler(deps)(post({ offer: "pass" }, "free", "checkout"));
+  assert.equal(deps.calls.checkouts[1].customer, "cus_9");
+  assert.equal(deps.calls.checkouts[1].customer_creation, undefined);
+});

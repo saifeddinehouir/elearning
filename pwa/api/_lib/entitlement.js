@@ -4,6 +4,9 @@
 //   subscriptionActive  true while a subscription (monthly or yearly) is active, trialing
 //                       or retrying a failed renewal (past_due)
 //   subscriptionId, subscriptionStatus, stripeCustomerId
+//   subscriptionInterval  "month" | "year"
+//   subscriptionRenewsAt  ms; end of the current paid period
+//   subscriptionEndsAt    ms when cancelled (Pro until then, no renewal), else null
 //   proUntil            ms; end of a one-off interview pass (null if none)
 //   usage               { "YYYY-MM": videos turned into decks that month }
 
@@ -39,7 +42,12 @@ export function publicPlan(user, now = Date.now()) {
   return {
     plan: pro ? "pro" : "free",
     subscription: user?.subscriptionActive === true,
+    interval: user?.subscriptionActive ? user.subscriptionInterval || null : null,
+    renewsAt: user?.subscriptionActive && !user.subscriptionEndsAt ? user.subscriptionRenewsAt ?? null : null,
+    endsAt: user?.subscriptionActive ? user.subscriptionEndsAt ?? null : null,
     proUntil: Number.isFinite(user?.proUntil) ? user.proUntil : null,
+    // A Stripe customer exists, so the billing page has something to show.
+    billing: !!user?.stripeCustomerId,
     videosThisMonth: videosUsed(user, now),
     videoLimit: MONTHLY_VIDEO_LIMIT,
   };
@@ -80,7 +88,21 @@ export function patchForEvent(event, user, now = Date.now()) {
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const status = event.type === "customer.subscription.deleted" ? "canceled" : o.status;
-      return { subscriptionActive: ACTIVE.has(status), subscriptionId: o.id || null, subscriptionStatus: status || null };
+      const item = o.items?.data?.[0] || {};
+      // The period end lives on the item in current API versions, on the
+      // subscription in older ones.
+      const periodEnd = item.current_period_end ?? o.current_period_end;
+      const ms = (s) => (Number.isFinite(s) ? s * 1000 : null);
+      return {
+        subscriptionActive: ACTIVE.has(status),
+        subscriptionId: o.id || null,
+        subscriptionStatus: status || null,
+        subscriptionInterval: item.price?.recurring?.interval || null,
+        subscriptionRenewsAt: ms(periodEnd),
+        // Cancelled but still paid up: Pro until the end date, no renewal.
+        subscriptionEndsAt: o.cancel_at_period_end ? ms(periodEnd) : ms(o.cancel_at),
+        ...(o.customer ? { stripeCustomerId: o.customer } : {}),
+      };
     }
     default:
       return null;

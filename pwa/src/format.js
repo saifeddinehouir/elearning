@@ -64,3 +64,13 @@ export function greetingFor(hour, name = "") {
   const first = firstName(name);
   return first ? `${g}, ${first}` : g;
 }
+
+// "17 November 2026" (in the user's locale).
+export const fmtDateLong = (ms) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+// "Saif Eddine Houir" → "SE"; falls back to the email's first letter.
+export function initials(name, email = "") {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length) return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
+  return String(email || "?").trim().charAt(0).toUpperCase() || "?";
+}

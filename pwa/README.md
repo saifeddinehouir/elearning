@@ -262,6 +262,7 @@ Vercel functions in [`api/`](api/) (web-standard `fetch` handlers):
 | `GET /api/me` | The signed-in user's plan and video-deck usage |
 | `GET /api/offers` | The offers that can be bought, with Stripe's prices (public) |
 | `POST /api/checkout` | A Stripe Checkout page for `monthly`, `yearly` (subscriptions) or `pass` (one-off, 90 days) |
+| `POST /api/billing-portal` | Stripe's customer portal for the signed-in user (cancel, card, invoices) |
 | `POST /api/stripe-webhook` | Grants or removes Pro from Stripe events, once per event |
 | `POST /api/youtube-deck` | A deck from a YouTube video (Pro, 30 a month) |
 
@@ -293,7 +294,9 @@ generation doesn't count toward the monthly 30.
    yearly recurring price, and optionally a one-off price for the interview
    pass. Add a webhook to
    `https://<your-domain>/api/stripe-webhook` for `checkout.session.completed`
-   and `customer.subscription.created` / `.updated` / `.deleted`.
+   and `customer.subscription.created` / `.updated` / `.deleted`. Turn on
+   the customer portal (*Settings → Billing → Customer portal*) so
+   **Account → Manage subscription** can open it.
 3. **Vercel**: import the repo with **Root Directory `pwa`** (framework
    *Other*, no build command), and set these environment variables:
 

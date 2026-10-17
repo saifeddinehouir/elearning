@@ -12,7 +12,8 @@ import { installAndOpenPath, installAndOpenLibrary, openRoadmapDetail, pathPromo
 import { LIBRARIES } from "../library.js";
 import { openDeckDetail } from "./decks.js";
 import { openCheatSheet } from "./guide.js";
-import { greetingFor } from "../format.js";
+import { greetingFor, initials } from "../format.js";
+import { openAccount } from "./account.js";
 import { currentUser } from "../account.js";
 import { todaySetup, interviewCard } from "./interview.js";
 
@@ -29,6 +30,7 @@ export async function renderDaily() {
   const setup = await todaySetup(allPool, decks, settings);
   const { pool, config } = setup;
 
+  const me = currentUser();
   const wrap = h("div", {});
   wrap.appendChild(
     h(
@@ -38,9 +40,14 @@ export async function renderDaily() {
         "div",
         {},
         h("div", { class: "kicker" }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
-        h("h1", { class: "screen-title" }, greetingFor(new Date().getHours(), currentUser()?.name))
+        h("h1", { class: "screen-title" }, greetingFor(new Date().getHours(), me?.name))
       ),
-      h("button", { class: "btn icon-btn", onclick: () => openSettings(), "aria-label": "Settings", html: ICONS.gear })
+      h(
+        "div",
+        { class: "row", style: "gap:8px" },
+        me ? h("button", { class: "avatar sm", onclick: () => openAccount(), "aria-label": "Account", title: me.email || "Account" }, initials(me.name, me.email)) : null,
+        h("button", { class: "btn icon-btn", onclick: () => openSettings(), "aria-label": "Settings", html: ICONS.gear })
+      )
     )
   );
 

@@ -3,6 +3,7 @@ import { onChange, getSettings, requestPersistentStorage, renameBuiltinPaths } f
 import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement, accountStatus, knownAccount } from "./account.js";
 import { gateFor } from "./gate.js";
 import { renderSignIn } from "./views/signin.js";
+import { openAccount } from "./views/account.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 
@@ -160,6 +161,23 @@ if (accountsConfigured()) {
   onAccountChange(render);
   startAccounts().catch((err) => console.error(err));
   handleCheckoutReturn();
+  handleBillingReturn();
+}
+
+// Back from Stripe's billing page (?billing=return): refresh the plan, since
+// it may have been cancelled or changed there, and reopen the Account page.
+function handleBillingReturn() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has("billing")) return;
+  params.delete("billing");
+  const query = params.toString();
+  history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+  const stop = onAccountChange(async () => {
+    if (accountStatus() !== "signed_in") return;
+    stop();
+    await refreshEntitlement().catch(() => null);
+    openAccount();
+  });
 }
 
 // Back from Stripe Checkout (?checkout=success|cancel). The webhook that

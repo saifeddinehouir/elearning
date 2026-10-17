@@ -1,10 +1,11 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride, getEntitlement, previewAllowed } from "../store.js";
-import { accountsConfigured, currentUser, signIn, signOut, onAccountChange, updateName } from "../account.js";
+import { accountsConfigured, currentUser, signIn, onAccountChange } from "../account.js";
+import { openAccount } from "./account.js";
 import { isPro } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
 import { openInterviewSheet } from "./interview.js";
-import { fmtDateFull, firstName } from "../format.js";
+import { fmtDateFull, initials } from "../format.js";
 import { permission, requestPermission, notificationsSupported } from "../notifications.js";
 
 export function openSettings() {
@@ -181,6 +182,7 @@ export function openSettings() {
     paintPermission();
 
     // ---------- Account ----------
+    // One row here; the Account page has the profile, plan and billing.
     if (accountsConfigured()) {
       body.appendChild(h("div", { class: "section-header" }, "Account"));
       const accountList = h("div", { class: "list" });
@@ -204,45 +206,14 @@ export function openSettings() {
           return;
         }
         const ent = getEntitlement();
-        const planLine = ent?.plan === "pro"
-          ? ent.subscription
-            ? "Pro subscription"
-            : `Pro until ${fmtDateFull(ent.proUntil)}`
-          : "Free plan";
         accountList.appendChild(
           h(
-            "div",
-            { class: "list-row inset" },
-            h("span", { class: "icon-chip c-accent", html: ICONS.unlock }),
-            h("span", { class: "label" }, u.email || u.name || "Signed in", h("span", { class: "sub" }, planLine)),
-            h(
-              "button",
-              { class: "btn", onclick: () => signOut().then(() => toast("Signed out")) },
-              "Sign out"
-            )
+            "button",
+            { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => openAccount() },
+            h("span", { class: "avatar sm", "aria-hidden": "true" }, initials(u.name, u.email)),
+            h("span", { class: "label" }, u.name || u.email || "Your account", h("span", { class: "sub" }, ent?.plan === "pro" ? "Pro · Manage your plan and billing" : "Free · Account and plan")),
+            h("span", { class: "chevron", html: ICONS.chevron })
           )
-        );
-        // The name Today greets you by.
-        const nameInput = h("input", {
-          type: "text",
-          value: u.name || "",
-          placeholder: "Add your name",
-          autocomplete: "given-name",
-          disabled: !!u.offline,
-          style: "width:auto;flex:1;min-width:0;background:none;border:none;padding:0;text-align:right",
-          onchange: async (e) => {
-            const value = e.target.value.trim();
-            if (value === (u.name || "")) return;
-            try {
-              await updateName(value);
-              toast(value ? `Hi, ${firstName(value)}!` : "Name removed");
-            } catch (err) {
-              toast(err.message || "Couldn't save your name", 3000);
-            }
-          },
-        });
-        accountList.appendChild(
-          h("label", { class: "list-row inset" }, h("span", { class: "icon-chip c-purple", html: ICONS.pencil }), h("span", { class: "label" }, "Name"), nameInput)
         );
       };
       paintAccount();

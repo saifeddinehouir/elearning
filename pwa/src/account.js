@@ -56,7 +56,15 @@ function rememberAccount(u) {
 // The signed-in user as { email, name }, or null. Offline, the remembered
 // account stands in until Firebase can confirm it.
 export function currentUser() {
-  if (user) return { email: user.email, name: user.displayName };
+  if (user) {
+    return {
+      email: user.email,
+      name: user.displayName,
+      // "google.com" or "password" (email and password)
+      provider: user.providerData?.[0]?.providerId || null,
+      verified: !!user.emailVerified,
+    };
+  }
   const known = status === "signed_out" ? null : knownAccount();
   return known ? { email: known.email, name: known.name || null, offline: true } : null;
 }
@@ -145,6 +153,12 @@ export async function updateName(name) {
   notify();
 }
 
+export async function resendVerification() {
+  if (!user) throw new ApiError(401, "signed_out", "Sign in first.");
+  const { fa } = await firebase();
+  await fa.sendEmailVerification(user);
+}
+
 export async function resetPassword(email) {
   const { fa, auth } = await firebase();
   await fa.sendPasswordResetEmail(auth, email.trim());
@@ -202,6 +216,12 @@ export async function refreshEntitlement() {
 // Sends the browser to Stripe Checkout for "monthly", "yearly" or "pass".
 export async function startCheckout(offer) {
   const { url } = await api("checkout", { method: "POST", body: { offer } });
+  location.href = url;
+}
+
+// Sends the browser to Stripe's billing page (cancel, card, invoices).
+export async function openBillingPortal() {
+  const { url } = await api("billing-portal", { method: "POST" });
   location.href = url;
 }
 

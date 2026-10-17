@@ -143,6 +143,20 @@ export function realDeps() {
       return (await stripe()).prices.retrieve(priceId);
     },
 
+    // Stripe's hosted billing page: cancel, change card, invoices.
+    async createPortal(params) {
+      const { default: Stripe } = await import("stripe");
+      try {
+        return await (await stripe()).billingPortal.sessions.create(params);
+      } catch (err) {
+        if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+          console.error("Billing portal unavailable", err.message);
+          throw new HttpError(503, "portal_not_configured", "The billing page isn't set up yet. Try again later.");
+        }
+        throw err;
+      }
+    },
+
     async createCheckout(params) {
       return (await stripe()).checkout.sessions.create(params);
     },
