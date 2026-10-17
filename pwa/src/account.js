@@ -117,6 +117,25 @@ export async function signIn() {
   }
 }
 
+export async function signInWithEmail(email, password) {
+  const { fa, auth } = await firebase();
+  await fa.signInWithEmailAndPassword(auth, email.trim(), password);
+}
+
+// New account; the name (optional) shows in Settings, and a verification
+// email goes out without holding up sign-in.
+export async function createAccount(email, password, name = "") {
+  const { fa, auth } = await firebase();
+  const { user: u } = await fa.createUserWithEmailAndPassword(auth, email.trim(), password);
+  if (name.trim()) await fa.updateProfile(u, { displayName: name.trim() }).catch(() => {});
+  fa.sendEmailVerification(u).catch((err) => console.error(err));
+}
+
+export async function resetPassword(email) {
+  const { fa, auth } = await firebase();
+  await fa.sendPasswordResetEmail(auth, email.trim());
+}
+
 export async function signOut() {
   const { fa, auth } = await firebase();
   await fa.signOut(auth);

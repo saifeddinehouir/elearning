@@ -30,3 +30,15 @@ test("plans are enforced, and the preview switch only works on localhost", () =>
   assert.ok(isDevHost("localhost") && isDevHost("127.0.0.1"));
   for (const h of ["elearning-pwa.vercel.app", "saifeddinehouir.github.io", "localhost.evil.com"]) assert.ok(!isDevHost(h), h);
 });
+
+test("sign-in errors read as plain sentences, and typos are caught before a request", async () => {
+  const { authErrorMessage, checkCredentials } = await import("../src/auth-errors.js");
+  assert.equal(authErrorMessage({ code: "auth/invalid-credential" }), "Wrong email or password.");
+  assert.match(authErrorMessage({ code: "auth/email-already-in-use" }), /Sign in instead/);
+  assert.equal(authErrorMessage({ code: "auth/something-new" }), "Couldn't sign in. Try again.");
+  assert.equal(checkCredentials({ email: "", password: "x" }), "Enter your email.");
+  assert.match(checkCredentials({ email: "nope", password: "x" }), /doesn't look right/);
+  assert.equal(checkCredentials({ email: "a@b.co", password: "" }), "Enter your password.");
+  assert.match(checkCredentials({ email: "a@b.co", password: "12345", creating: true }), /6 characters/);
+  assert.equal(checkCredentials({ email: " a@b.co ", password: "12345" }), null);
+});
