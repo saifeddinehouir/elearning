@@ -16,7 +16,7 @@ import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./s
 import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 import { libraryByKey, libraryKeyFor } from "./library.js";
-import { effectivePlan, entitledFrom, isPlan, canInstallPath, libraryEntriesFor } from "./plan.js";
+import { effectivePlan, entitledFrom, isPlan, isDevHost, canInstallPath, libraryEntriesFor } from "./plan.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -60,7 +60,12 @@ export function setSettings(patch) {
 
 const PLAN_KEY = "dailyqcm.plan";
 
+// The preview switch's value, on a development host only; anywhere else it's
+// ignored, so it can't unlock Pro.
+export const previewAllowed = () => typeof location !== "undefined" && isDevHost(location.hostname);
+
 export function getPlanOverride() {
+  if (!previewAllowed()) return null;
   try {
     const p = localStorage.getItem(PLAN_KEY);
     return isPlan(p) ? p : null;

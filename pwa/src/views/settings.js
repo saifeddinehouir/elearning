@@ -1,5 +1,5 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride, getEntitlement } from "../store.js";
+import { getSettings, setSettings, exportBackup, restoreBackup, checkBackup, backupSummary, lastBackupAt, getPlan, getPlanOverride, setPlanOverride, getEntitlement, previewAllowed } from "../store.js";
 import { accountsConfigured, currentUser, signIn, signOut, onAccountChange } from "../account.js";
 import { isPro } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
@@ -246,36 +246,39 @@ export function openSettings() {
     );
     body.appendChild(planList);
 
-    const previewWrap = h("div", { class: "list", style: "padding:12px 16px" });
-    const previewControl = h("div", { class: "segmented" });
-    const previewButtons = [];
-    const currentOverride = getPlanOverride() || "default";
-    for (const [val, label] of [
-      ["default", "Default"],
-      ["free", "Free"],
-      ["pro", "Pro"],
-    ]) {
-      const btn = h(
-        "button",
-        {
-          class: currentOverride === val ? "active" : "",
-          onclick: () => {
-            setPlanOverride(val === "default" ? null : val);
-            for (const b of previewButtons) b.classList.toggle("active", b.dataset.val === val);
-            paintPlan();
+    // Testing aid, shown only when running on localhost; production ignores it.
+    if (previewAllowed()) {
+      const previewWrap = h("div", { class: "list", style: "padding:12px 16px" });
+      const previewControl = h("div", { class: "segmented" });
+      const previewButtons = [];
+      const currentOverride = getPlanOverride() || "default";
+      for (const [val, label] of [
+        ["default", "Default"],
+        ["free", "Free"],
+        ["pro", "Pro"],
+      ]) {
+        const btn = h(
+          "button",
+          {
+            class: currentOverride === val ? "active" : "",
+            onclick: () => {
+              setPlanOverride(val === "default" ? null : val);
+              for (const b of previewButtons) b.classList.toggle("active", b.dataset.val === val);
+              paintPlan();
+            },
           },
-        },
-        label
+          label
+        );
+        btn.dataset.val = val;
+        previewButtons.push(btn);
+        previewControl.appendChild(btn);
+      }
+      previewWrap.appendChild(previewControl);
+      body.appendChild(previewWrap);
+      body.appendChild(
+        h("p", { class: "list-footnote" }, "Development only (localhost): preview the app as a free or Pro user. Default uses your real plan. Nothing you've already added is ever removed.")
       );
-      btn.dataset.val = val;
-      previewButtons.push(btn);
-      previewControl.appendChild(btn);
     }
-    previewWrap.appendChild(previewControl);
-    body.appendChild(previewWrap);
-    body.appendChild(
-      h("p", { class: "list-footnote" }, "Preview the app as a free or Pro user on this device. Payments aren't live yet, so Default is Pro. Nothing you've already added is ever removed.")
-    );
 
     // ---------- Backup ----------
     body.appendChild(h("div", { class: "section-header" }, "Backup"));

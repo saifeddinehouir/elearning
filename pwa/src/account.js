@@ -10,43 +10,91 @@ const FIREBASE = "https://www.gstatic.com/firebasejs/13.0.0/";
 
 export const accountsConfigured = () => !!FIREBASE_CONFIG;
 
+// Firebase comes from the network; offline it can't load, so give up after a
+// while instead of leaving the app on a spinner.
+const LOAD_TIMEOUT_MS = 8000;
+
 let firebasePromise = null;
 function firebase() {
   firebasePromise ??= (async () => {
-    const { initializeApp } = await import(`${FIREBASE}firebase-app.js`);
-    const fa = await import(`${FIREBASE}firebase-auth.js`);
-    return { fa, auth: fa.getAuth(initializeApp(FIREBASE_CONFIG)) };
-  })();
+    const load = (async () => {
+      const { initializeApp } = await import(`${FIREBASE}firebase-app.js`);
+      const fa = await import(`${FIREBASE}firebase-auth.js`);
+      return { fa, auth: fa.getAuth(initializeApp(FIREBASE_CONFIG)) };
+    })();
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Sign-in service didn't load")), LOAD_TIMEOUT_MS));
+    return Promise.race([load, timeout]);
+  })().catch((err) => {
+    firebasePromise = null; // let a later attempt retry
+    throw err;
+  });
   return firebasePromise;
 }
 
 let user = null;
-let ready = false;
+let status = "loading"; // "loading" | "signed_in" | "signed_out" | "unavailable"
 const listeners = new Set();
 const notify = () => listeners.forEach((fn) => fn());
 
-// The signed-in user as { email, name }, or null.
-export const currentUser = () => (user ? { email: user.email, name: user.displayName } : null);
-export const accountReady = () => ready;
+// Who last signed in on this device, kept until they sign out, so the app
+// opens offline for them (see gate.js).
+const KNOWN_KEY = "dailyqcm.account";
+export function knownAccount() {
+  try {
+    return JSON.parse(localStorage.getItem(KNOWN_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+function rememberAccount(u) {
+  try {
+    if (u) localStorage.setItem(KNOWN_KEY, JSON.stringify({ uid: u.uid, email: u.email || null }));
+    else localStorage.removeItem(KNOWN_KEY);
+  } catch {}
+}
+
+// The signed-in user as { email, name }, or null. Offline, the remembered
+// account stands in until Firebase can confirm it.
+export function currentUser() {
+  if (user) return { email: user.email, name: user.displayName };
+  const known = status === "signed_out" ? null : knownAccount();
+  return known ? { email: known.email, name: null, offline: true } : null;
+}
+export const accountStatus = () => status;
+export const accountReady = () => status !== "loading";
 export function onAccountChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-// Call once on start. Finishes a redirect sign-in if one is pending, then
-// keeps the cached plan in step with whoever is signed in.
+// Call once on start (and again to retry after "unavailable"). Finishes a
+// redirect sign-in if one is pending, then follows sign-in changes; the plan
+// is refreshed in the background so opening the app never waits on /api.
+let listening = false;
 export async function startAccounts() {
   if (!accountsConfigured()) return;
-  const { fa, auth } = await firebase();
+  let fb;
+  try {
+    fb = await firebase();
+  } catch (err) {
+    console.error(err);
+    status = "unavailable";
+    notify();
+    return;
+  }
+  const { fa, auth } = fb;
   try {
     await fa.getRedirectResult(auth);
   } catch (err) {
     console.error("Sign-in redirect failed", err);
   }
-  fa.onAuthStateChanged(auth, async (u) => {
+  if (listening) return;
+  listening = true;
+  fa.onAuthStateChanged(auth, (u) => {
     user = u;
-    ready = true;
-    if (u) await refreshEntitlement().catch((err) => console.error(err));
+    status = u ? "signed_in" : "signed_out";
+    rememberAccount(u);
+    if (u) refreshEntitlement().catch((err) => console.error(err));
     else setEntitlement(null);
     notify();
   });

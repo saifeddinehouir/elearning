@@ -585,6 +585,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* ---------- Today ---------- */
 .welcome { padding: 18px 0 22px; }
 .welcome-emoji { display: none; }
+.signin { padding-top: max(8vh, calc(var(--safe-t) + 24px)); }
 .welcome .promo-title { font-size: 2.3rem; text-align: left !important; letter-spacing: -0.022em; line-height: 0.98; }
 .welcome p { text-align: left !important; }
 .card.option { align-items: center; gap: 14px; padding: 16px 0; border-top-width: 1px; border-top-color: var(--ink); }

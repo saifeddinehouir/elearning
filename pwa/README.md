@@ -234,11 +234,12 @@ YouTube videos and, later, cloud sync.
   stays usable on any plan. A library's roadmap lists the decks you don't
   have yet: **Unlock with Pro** on the free plan, **Add all** on Pro (they
   join the same roadmap).
-- `ENFORCE` is `false`, so everyone is on Pro until billing exists.
-  **Settings → Plan** has a per-device preview switch (Default / Free / Pro).
-- A plan bought through Stripe (see below) is checked by the server and
-  cached on the device, so it counts even with `ENFORCE` off. The preview
-  switch still overrides it on that device.
+- `ENFORCE` is on: Pro comes only from a plan the server confirms (a Stripe
+  purchase, or a `users/{uid}` document you edit by hand in Firestore). It's
+  cached on the device so it holds offline.
+- **Settings → Plan** has a Default / Free / Pro preview switch for testing.
+  It shows, and is honored, only on `localhost`; on any deployed site it's
+  ignored, so it can't unlock Pro.
 - Server-side features (video decks) are enforced by the server. Built-in
   content is not yet: everything under `library/` is public, so the free
   limits there are a nudge, not a lock, until Pro content moves behind
@@ -246,8 +247,13 @@ YouTube videos and, later, cloud sync.
 
 ## Server: accounts, payments and video decks
 
-Optional. With `FIREBASE_CONFIG` left `null` in [`src/config.js`](src/config.js)
-the app is the same static PWA as before. Filled in, it gains Google sign-in,
+With `FIREBASE_CONFIG` set in [`src/config.js`](src/config.js) (it is, for the
+`dailyqcm` project), the app opens on a sign-in screen: **Continue with
+Google** signs in, or creates the account on first use. Someone who signed
+in on a device before opens straight in, even offline, until they sign out
+([`src/gate.js`](src/gate.js)); decks stay on the device either way. Set it to
+`null` and the app is the same static PWA as before. With accounts on, it
+gains Google sign-in,
 Stripe checkout, and **Import → From a YouTube video**. The server is a set of
 Vercel functions in [`api/`](api/) (web-standard `fetch` handlers):
 

@@ -1,6 +1,8 @@
 import { h, clear, closeOverlay, toast, ICONS } from "./dom.js";
 import { onChange, getSettings, requestPersistentStorage, renameBuiltinPaths } from "./store.js";
-import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement, currentUser } from "./account.js";
+import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement, accountStatus, knownAccount } from "./account.js";
+import { gateFor } from "./gate.js";
+import { renderSignIn } from "./views/signin.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 
@@ -70,6 +72,16 @@ let renderSeq = 0;
 // The enter animation plays only when the tab actually changed.
 async function render() {
   const seq = ++renderSeq;
+
+  // Signed out (with accounts set up): the sign-in screen instead of the app.
+  const gate = gateFor({ configured: accountsConfigured(), status: accountStatus(), knownAccount: !!knownAccount() });
+  if (gate !== "open") {
+    closeOverlay();
+    clear(appRoot).append(renderSignIn({ loading: gate === "loading" }));
+    lastRenderedTab = null;
+    return;
+  }
+
   const tab = TABS.find((t) => t.id === current) || TABS[0];
 
   const view = h("div", { id: "view", class: lastRenderedTab === tab.id ? "" : "view-enter" });
@@ -162,7 +174,7 @@ function handleCheckoutReturn() {
   if (result !== "success") return toast("Checkout cancelled. Nothing was charged.", 3000);
   toast("Payment received. Unlocking Pro…", 3000);
   const stop = onAccountChange(async () => {
-    if (!currentUser()) return;
+    if (accountStatus() !== "signed_in") return;
     stop();
     for (let i = 0; i < 6; i++) {
       const me = await refreshEntitlement().catch(() => null);

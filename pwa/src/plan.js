@@ -4,12 +4,17 @@
 // Anything already on the device stays usable whatever the plan, so turning
 // enforcement on (or a subscription lapsing) never takes progress away.
 //
-// Nothing is enforced until ENFORCE is true: until billing is live everyone
-// gets Pro. A per-device override (see effectivePlan) previews either side.
+// With ENFORCE on, Pro comes only from a plan the server confirmed (a Stripe
+// purchase). The per-device preview override (see effectivePlan) is honored
+// only on a development host, so it can't be used to unlock Pro.
 
 import { PATTERN_PATH } from "./patterns.js";
 
-export const ENFORCE = false;
+export const ENFORCE = true;
+
+// Hosts where the Free/Pro preview switch works.
+export const DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
+export const isDevHost = (hostname) => DEV_HOSTS.has(hostname);
 
 export const PLANS = ["free", "pro"];
 
