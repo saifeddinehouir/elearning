@@ -280,3 +280,45 @@ test("service-account setup problems are named, never echoed", async () => {
   // Leading/trailing whitespace from a paste is fine.
   assert.ok(parseServiceAccount(`  ${JSON.stringify({ type: "service_account", project_id: "p", client_email: "e", private_key: "k" })}\n`).account);
 });
+
+test("offers: only priced offers are listed, with Stripe's amounts, and cached", async () => {
+  const { createHandler: offersHandler } = await import("../api/offers.js");
+  let lookups = 0;
+  const deps = fakeDeps({
+    async getPrice(id) {
+      lookups++;
+      if (id === "price_month") return { unit_amount: 499, currency: "usd", recurring: { interval: "month" } };
+      throw Object.assign(new Error("No such price"), { code: "resource_missing" });
+    },
+  });
+  deps.env = { STRIPE_PRICE_MONTHLY: "price_month", STRIPE_PRICE_PASS: "price_broken" };
+  const h = offersHandler(deps);
+  const body = await (await h(new Request("https://app.test/api/offers"))).json();
+  assert.deepEqual(body.offers, [
+    { id: "pass", amount: null, currency: null, interval: null },
+    { id: "monthly", amount: 499, currency: "usd", interval: "month" },
+  ]);
+  await h(new Request("https://app.test/api/offers"));
+  assert.equal(lookups, 2, "second call served from cache");
+});
+
+test("checkout: the monthly offer is a subscription carrying the uid", async () => {
+  const deps = fakeDeps();
+  deps.env.STRIPE_PRICE_MONTHLY = "price_month";
+  const res = await checkoutHandler(deps)(post({ offer: "monthly" }, "free", "checkout"));
+  assert.equal(res.status, 200);
+  const p = deps.calls.checkouts[0];
+  assert.equal(p.mode, "subscription");
+  assert.deepEqual(p.line_items, [{ price: "price_month", quantity: 1 }]);
+  assert.deepEqual(p.subscription_data, { metadata: { uid: "free" } });
+  delete deps.env.STRIPE_PRICE_MONTHLY;
+  assert.equal((await checkoutHandler(deps)(post({ offer: "monthly" }, "free", "checkout"))).status, 503);
+});
+
+test("prices are formatted from Stripe's minor units", async () => {
+  const { fmtPrice } = await import("../src/format.js");
+  assert.equal(fmtPrice(499, "usd", "month", "en-US"), "$4.99 / month");
+  assert.equal(fmtPrice(3900, "eur", "year", "en-US"), "€39.00 / year");
+  assert.equal(fmtPrice(500, "jpy", null, "en-US"), "¥500");
+  assert.equal(fmtPrice(null, "usd"), "");
+});

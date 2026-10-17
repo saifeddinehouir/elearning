@@ -167,13 +167,25 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
+// The offers the server can sell right now, with Stripe prices. Public: no
+// sign-in needed. [] when payments aren't set up or the server can't be reached.
+export async function fetchOffers() {
+  try {
+    const res = await fetch(`${API_BASE}/api/offers`);
+    if (!res.ok) return [];
+    return (await res.json()).offers || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function refreshEntitlement() {
   const me = await api("me");
   setEntitlement({ ...me, checkedAt: Date.now() });
   return me;
 }
 
-// Sends the browser to Stripe Checkout for "pass" or "yearly".
+// Sends the browser to Stripe Checkout for "monthly", "yearly" or "pass".
 export async function startCheckout(offer) {
   const { url } = await api("checkout", { method: "POST", body: { offer } });
   location.href = url;

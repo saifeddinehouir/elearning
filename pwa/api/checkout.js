@@ -1,4 +1,4 @@
-// POST /api/checkout  Body: { offer: "pass" | "yearly" }
+// POST /api/checkout  Body: { offer: "pass" | "monthly" | "yearly" }
 // Header: Authorization: Bearer <Firebase ID token>
 // → 200 { url } of a Stripe Checkout page. The webhook grants Pro once paid.
 
@@ -18,7 +18,7 @@ export function createHandler(deps) {
 
     const user = await deps.getUser(uid);
     if (def.mode === "subscription" && user?.subscriptionActive) {
-      throw new HttpError(409, "already_subscribed", "You already have the yearly plan.");
+      throw new HttpError(409, "already_subscribed", "You already have a Pro subscription.");
     }
 
     const params = {

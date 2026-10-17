@@ -42,3 +42,12 @@ export function fmtDateFull(ms) {
 }
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+// A Stripe amount (minor units) as a price, e.g. 499 "usd" "month" → "$4.99 / month".
+export function fmtPrice(amount, currency, interval = null, locale = undefined) {
+  if (!Number.isFinite(amount) || !currency) return "";
+  const nf = new Intl.NumberFormat(locale, { style: "currency", currency: currency.toUpperCase() });
+  const digits = nf.resolvedOptions().maximumFractionDigits;
+  const text = nf.format(amount / 10 ** digits);
+  return interval ? `${text} / ${interval}` : text;
+}

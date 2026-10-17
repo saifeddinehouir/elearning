@@ -260,7 +260,8 @@ Vercel functions in [`api/`](api/) (web-standard `fetch` handlers):
 | Endpoint | What it does |
 |---|---|
 | `GET /api/me` | The signed-in user's plan and video-deck usage |
-| `POST /api/checkout` | A Stripe Checkout page for `pass` (one-off, 90 days) or `yearly` |
+| `GET /api/offers` | The offers that can be bought, with Stripe's prices (public) |
+| `POST /api/checkout` | A Stripe Checkout page for `monthly`, `yearly` (subscriptions) or `pass` (one-off, 90 days) |
 | `POST /api/stripe-webhook` | Grants or removes Pro from Stripe events, once per event |
 | `POST /api/youtube-deck` | A deck from a YouTube video (Pro, 30 a month) |
 
@@ -288,8 +289,9 @@ generation doesn't count toward the monthly 30.
    *Web app* and paste its config into `FIREBASE_CONFIG`. Add your Vercel
    domain under *Authentication → Settings → Authorized domains*. Create a
    service-account key (*Project settings → Service accounts*) for the server.
-2. **Stripe**: create two prices, a one-off price for the interview pass and
-   a yearly recurring price. Add a webhook to
+2. **Stripe**: create a price for each offer you sell: a monthly and/or
+   yearly recurring price, and optionally a one-off price for the interview
+   pass. Add a webhook to
    `https://<your-domain>/api/stripe-webhook` for `checkout.session.completed`
    and `customer.subscription.created` / `.updated` / `.deleted`.
 3. **Vercel**: import the repo with **Root Directory `pwa`** (framework
@@ -300,14 +302,15 @@ generation doesn't count toward the monthly 30.
    | `FIREBASE_SERVICE_ACCOUNT` | the service-account JSON, on one line |
    | `STRIPE_SECRET_KEY` | `sk_live_…` (or `sk_test_…` while testing) |
    | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook |
-   | `STRIPE_PRICE_PASS`, `STRIPE_PRICE_YEARLY` | the two price ids |
+   | `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_PRICE_PASS` | price ids; set only the offers you sell (the upgrade sheet shows those) |
    | `APP_URL` | `https://<your-domain>` (checkout returns here) |
    | `ANTHROPIC_API_KEY` | for video decks |
    | `TRANSCRIPT_MCP_URL`, `TRANSCRIPT_MCP_TOKEN` | optional, see above |
    | `DECK_EFFORT` | optional, default `high` |
 
-4. Put the prices in `OFFERS` in [`src/config.js`](src/config.js) so the
-   upgrade sheet shows them.
+4. Nothing to set in the app for prices: the upgrade sheet asks
+   `/api/offers` and shows Stripe's amounts. The wording of each offer is in
+   `OFFERS` in [`src/config.js`](src/config.js).
 
 Server tests run with fakes, no keys needed (`tests/api.test.mjs`); the
 sign-in token test needs `npm install` once (it uses `jose`). The app itself

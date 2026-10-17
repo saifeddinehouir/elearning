@@ -2,7 +2,8 @@ import { h, openOverlay, toast, ICONS } from "../dom.js";
 import { getPlan } from "../store.js";
 import { PRO_FEATURES, isPro } from "../plan.js";
 import { OFFERS } from "../config.js";
-import { accountsConfigured, currentUser, signIn, startCheckout } from "../account.js";
+import { accountsConfigured, currentUser, signIn, startCheckout, fetchOffers } from "../account.js";
+import { fmtPrice } from "../format.js";
 
 // Signs in if needed, then hands over to Stripe Checkout.
 async function buy(offerId, button) {
@@ -57,25 +58,39 @@ export function openPaywall(reason = "") {
 
     if (!pro) {
       body.appendChild(h("div", { class: "section-header" }, "Get Pro"));
-      for (const offer of OFFERS) {
-        body.appendChild(
-          h(
-            "button",
-            { class: "card option", onclick: (e) => buy(offer.id, e.currentTarget) },
-            h(
-              "span",
-              { class: "spacer" },
-              h("span", { class: "option-title" }, offer.title),
-              h("span", { class: "option-sub" }, offer.sub)
-            ),
-            offer.price ? h("strong", {}, offer.price) : null,
-            h("span", { class: "chevron", html: ICONS.chevron })
-          )
-        );
-      }
+      const offersBox = h("div", {}, h("p", { class: "small muted" }, "Loading plans…"));
+      body.appendChild(offersBox);
       body.appendChild(
         h("p", { class: "list-footnote" }, "Payment is handled by Stripe. Anything already on this device stays yours, whatever your plan.")
       );
+      // Only offers the server can sell are shown, at Stripe's prices.
+      fetchOffers().then((live) => {
+        offersBox.replaceChildren();
+        const byId = new Map(live.map((o) => [o.id, o]));
+        const shown = OFFERS.filter((o) => byId.has(o.id));
+        if (shown.length === 0) {
+          offersBox.appendChild(h("p", { class: "small muted" }, "Upgrading isn't available right now. Try again later."));
+          return;
+        }
+        for (const offer of shown) {
+          const p = byId.get(offer.id);
+          const price = fmtPrice(p.amount, p.currency, p.interval);
+          offersBox.appendChild(
+            h(
+              "button",
+              { class: "card option", onclick: (e) => buy(offer.id, e.currentTarget) },
+              h(
+                "span",
+                { class: "spacer" },
+                h("span", { class: "option-title" }, offer.title),
+                h("span", { class: "option-sub" }, offer.sub)
+              ),
+              price ? h("strong", { class: "offer-price" }, price) : null,
+              h("span", { class: "chevron", html: ICONS.chevron })
+            )
+          );
+        }
+      });
     }
     return overlay;
   });

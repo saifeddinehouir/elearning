@@ -206,7 +206,7 @@ export function openSettings() {
         const ent = getEntitlement();
         const planLine = ent?.plan === "pro"
           ? ent.subscription
-            ? "Pro, yearly"
+            ? "Pro subscription"
             : `Pro until ${fmtDateFull(ent.proUntil)}`
           : "Free plan";
         accountList.appendChild(

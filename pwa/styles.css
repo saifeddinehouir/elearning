@@ -275,6 +275,7 @@ h1, h2, h3 { text-wrap: balance; }
 .badge.medium { color: var(--ink); border-color: var(--ink); }
 .badge.hard { color: var(--bad); border-color: var(--bad); }
 .badge.accent { color: var(--accent); border-color: var(--accent); }
+.offer-price { white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: 8px; }
 .badge.pro { color: var(--accent); border-color: var(--accent); margin-left: 6px; vertical-align: 2px; }
 
 /* ---------- Buttons ---------- */

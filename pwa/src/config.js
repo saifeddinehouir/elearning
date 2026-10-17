@@ -21,8 +21,11 @@ export const FIREBASE_CONFIG = {
 // both deployed on Vercel).
 export const API_BASE = "";
 
-// Shown on the upgrade sheet. Leave a price null to show the offer without one.
+// Wording for each offer on the upgrade sheet. Which offers appear, and their
+// prices, come from the server (/api/offers): only those with a Stripe price
+// id set in Vercel are shown.
 export const OFFERS = [
-  { id: "pass", title: "Interview pass", sub: "3 months of Pro, paid once. Buying another adds 3 more.", price: null },
-  { id: "yearly", title: "Pro, yearly", sub: "Renews every year until you cancel.", price: null },
+  { id: "monthly", title: "Pro, monthly", sub: "Renews every month. Cancel anytime." },
+  { id: "yearly", title: "Pro, yearly", sub: "Renews every year until you cancel." },
+  { id: "pass", title: "Interview pass", sub: "3 months of Pro, paid once. Buying another adds 3 more." },
 ];

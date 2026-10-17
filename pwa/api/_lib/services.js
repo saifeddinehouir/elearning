@@ -139,6 +139,10 @@ export function realDeps() {
       });
     },
 
+    async getPrice(priceId) {
+      return (await stripe()).prices.retrieve(priceId);
+    },
+
     async createCheckout(params) {
       return (await stripe()).checkout.sessions.create(params);
     },

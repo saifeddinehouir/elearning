@@ -1,7 +1,7 @@
 // Who has Pro, and how Stripe events change that. Pure.
 //
 // users/{uid} in Firestore (written only by the server):
-//   subscriptionActive  true while a yearly subscription is active, trialing
+//   subscriptionActive  true while a subscription (monthly or yearly) is active, trialing
 //                       or retrying a failed renewal (past_due)
 //   subscriptionId, subscriptionStatus, stripeCustomerId
 //   proUntil            ms; end of a one-off interview pass (null if none)
@@ -11,10 +11,22 @@ export const PASS_DAYS = 90;
 export const MONTHLY_VIDEO_LIMIT = 30;
 const DAY = 86400000;
 
+// Each offer is live when its price id is set in the environment.
 export const OFFERS = {
   pass: { mode: "payment", priceEnv: "STRIPE_PRICE_PASS" },
+  monthly: { mode: "subscription", priceEnv: "STRIPE_PRICE_MONTHLY" },
   yearly: { mode: "subscription", priceEnv: "STRIPE_PRICE_YEARLY" },
 };
+
+export const availableOffers = (env) => Object.keys(OFFERS).filter((id) => !!env[OFFERS[id].priceEnv]);
+
+// What the app shows for a Stripe price: { amount (minor units), currency,
+// interval: "month" | "year" | null }.
+export const priceSummary = (price) => ({
+  amount: Number.isFinite(price?.unit_amount) ? price.unit_amount : null,
+  currency: price?.currency || null,
+  interval: price?.recurring?.interval || null,
+});
 
 export function isProEntitled(user, now = Date.now()) {
   if (!user) return false;
