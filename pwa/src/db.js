@@ -1,7 +1,7 @@
 // Thin promise wrapper around IndexedDB. Browser-only.
 
 const DB_NAME = "dailyqcm";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export const STORES = {
   decks: "decks",
@@ -13,6 +13,8 @@ export const STORES = {
   flags: "flags",
   roadmaps: "roadmaps",
   challenges: "challenges",
+  // Cloud sync bookkeeping, one row per signed-in account (see sync.js).
+  sync: "sync",
 };
 
 let dbPromise = null;
@@ -61,6 +63,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains(STORES.challenges)) {
         db.createObjectStore(STORES.challenges, { keyPath: "dayStart" });
+      }
+      if (!db.objectStoreNames.contains(STORES.sync)) {
+        db.createObjectStore(STORES.sync, { keyPath: "id" });
       }
       void e;
     };

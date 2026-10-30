@@ -16,6 +16,7 @@ import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./s
 import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 import { libraryByKey, libraryKeyFor } from "./library.js";
+import { studyDaysFromAttempts } from "./sync.js";
 import { effectivePlan, entitledFrom, isPlan, isDevHost, canInstallPath, libraryEntriesFor } from "./plan.js";
 
 const bus = new EventTarget();
@@ -281,6 +282,7 @@ export async function recordAnswer(question, chosenIndex, now = Date.now()) {
   await dbPut(STORES.reviewState, nextState);
 
   await dbPut(STORES.attempts, {
+    syncId: uuid(), // the same answer's id on every synced device
     questionId: question.id,
     date: now,
     wasCorrect: correct,
@@ -813,6 +815,216 @@ export async function requestPersistentStorage() {
   }
 }
 
+// ---------- Cloud sync: device side ----------
+// sync.js decides what moves; these read this device's data for it and apply
+// what comes back from the cloud. Bookkeeping lives in STORES.sync, one row
+// per account: { id: uid, synced: { recordId: hash }, cursor, pending, lastSyncAt }.
+
+const SYNC_STORES = [
+  STORES.decks,
+  STORES.items,
+  STORES.questions,
+  STORES.reviewState,
+  STORES.attempts,
+  STORES.flags,
+  STORES.roadmaps,
+  STORES.challenges,
+];
+
+// Answers recorded before sync existed get a portable id once.
+async function ensureAttemptSyncIds() {
+  const missing = (await dbGetAll(STORES.attempts)).filter((a) => !a.syncId);
+  if (!missing.length) return;
+  await tx(STORES.attempts, "readwrite", (s) => {
+    for (const a of missing) s.put({ ...a, syncId: uuid() });
+  });
+}
+
+export async function readSyncSnapshot() {
+  await ensureAttemptSyncIds();
+  const rows = await Promise.all(SYNC_STORES.map((s) => dbGetAll(s)));
+  const snap = Object.fromEntries(SYNC_STORES.map((s, i) => [s, rows[i]]));
+  return { ...snap, settings: getSettings() };
+}
+
+export async function getSyncMeta(uid) {
+  const row = await dbGet(STORES.sync, uid);
+  return {
+    synced: new Map(Object.entries(row?.synced || {})),
+    cursor: row?.cursor ?? null,
+    pending: row?.pending || [],
+    lastSyncAt: row?.lastSyncAt ?? null,
+  };
+}
+
+export async function saveSyncMeta(uid, meta) {
+  await dbPut(STORES.sync, {
+    id: uid,
+    synced: Object.fromEntries(meta.synced),
+    cursor: meta.cursor ?? null,
+    pending: meta.pending || [],
+    lastSyncAt: meta.lastSyncAt ?? null,
+  });
+}
+
+function deckForRef(decks, ref) {
+  if (!ref) return null;
+  if (ref.deckId) return decks.find((d) => d.id === ref.deckId) || null;
+  const [type, ...rest] = String(ref.ref || "").split(":");
+  const key = rest.join(":");
+  return decks.find((d) => (type === "b" ? d.builtinKey === key : d.libraryKey === key)) || null;
+}
+
+/**
+ * Applies records pulled from the cloud (already merged and ordered by
+ * sync.js). data === null means "deleted there". Returns the records that
+ * couldn't be applied yet (e.g. a library install while offline), to retry
+ * on the next sync.
+ */
+export async function applySyncRecords(list) {
+  const failed = [];
+  if (!list.length) return { failed };
+  let attemptsChanged = false;
+  const batch = { review: [], flag: [], attempt: [], challenge: [] };
+
+  for (const r of list) {
+    try {
+      if (batch[r.kind]) {
+        batch[r.kind].push(r);
+        continue;
+      }
+      await applyStructural(r);
+    } catch (err) {
+      console.error("Sync: couldn't apply", r.id, err);
+      failed.push(r);
+    }
+  }
+
+  // Progress rows in a few transactions rather than one per row.
+  const questions = new Map((await dbGetAll(STORES.questions)).map((q) => [q.id, q]));
+  const attempts = await dbGetAll(STORES.attempts);
+  const attemptBySync = new Map(attempts.filter((a) => a.syncId).map((a) => [a.syncId, a]));
+  await tx([STORES.reviewState, STORES.flags, STORES.attempts, STORES.challenges], "readwrite", (s) => {
+    for (const r of batch.review) {
+      if (r.data == null) s[STORES.reviewState].delete(r.key);
+      else s[STORES.reviewState].put({ ...r.data, questionId: r.key, deckId: questions.get(r.key)?.deckId ?? null });
+    }
+    for (const r of batch.flag) {
+      if (r.data == null) s[STORES.flags].delete(r.key);
+      else s[STORES.flags].put({ ...r.data, questionId: r.key, deckId: questions.get(r.key)?.deckId ?? null });
+    }
+    for (const r of batch.attempt) {
+      const have = attemptBySync.get(r.key);
+      if (r.data == null) {
+        if (have) s[STORES.attempts].delete(have.id);
+        attemptsChanged ||= !!have;
+      } else if (!have) {
+        const row = { ...r.data, syncId: r.key };
+        delete row.id;
+        s[STORES.attempts].put(row);
+        attemptsChanged = true;
+      }
+    }
+    for (const r of batch.challenge) {
+      if (r.data == null) s[STORES.challenges].delete(Number(r.key));
+      else s[STORES.challenges].put({ ...r.data, dayStart: Number(r.key) });
+    }
+  });
+
+  await fixupProgressDeckIds();
+  if (attemptsChanged) await rebuildStudyDays();
+  await syncPathUnlocks();
+  emit();
+  return { failed };
+}
+
+async function applyStructural(r) {
+  const decks = await dbGetAll(STORES.decks);
+  switch (r.kind) {
+    case "settings":
+      if (r.data) localStorage.setItem(SETTINGS_KEY, JSON.stringify(r.data));
+      return;
+    case "path": {
+      const roadmaps = await dbGetAll(STORES.roadmaps);
+      const have = roadmaps.find((m) => m.builtin === r.key);
+      if (r.data == null) {
+        if (have) await dbDelete(STORES.roadmaps, have.id);
+      } else if (!have) {
+        if (pathByKey.has(r.key)) await installPatternPath(r.key);
+        else if (libraryByKey.has(r.key)) await installLibrary(r.key);
+      }
+      return;
+    }
+    case "deck": {
+      const have = decks.find((d) => d.id === r.key);
+      if (r.data == null) {
+        if (have) await deleteDeckCascade(r.key);
+        return;
+      }
+      const { deck, items = [], questions = [] } = r.data;
+      if (have) {
+        await dbPut(STORES.decks, { ...have, name: deck.name, includeInMix: deck.includeInMix, ...(deck.guide ? { guide: deck.guide } : {}) });
+        return;
+      }
+      await tx([STORES.decks, STORES.items, STORES.questions], "readwrite", (s) => {
+        s[STORES.decks].put({ ...deck, id: r.key });
+        for (const it of items) s[STORES.items].put({ ...it, deckId: r.key });
+        for (const q of questions) s[STORES.questions].put({ ...q, deckId: r.key });
+      });
+      return;
+    }
+    case "mix": {
+      const d = deckForRef(decks, { ref: r.key });
+      if (d && r.data) await dbPut(STORES.decks, { ...d, includeInMix: r.data.includeInMix });
+      return;
+    }
+    case "roadmap": {
+      if (r.data == null) {
+        await dbDelete(STORES.roadmaps, r.key);
+        return;
+      }
+      const nodes = (r.data.nodes || []).map(({ deck, ...n }) => ({ ...n, deckId: deckForRef(decks, deck)?.id ?? null }));
+      await dbPut(STORES.roadmaps, { ...r.data, id: r.key, nodes });
+      return;
+    }
+    default:
+      console.warn("Sync: unknown record kind", r.kind);
+  }
+}
+
+// Progress rows point at local deck ids, which differ between devices for
+// built-in decks; re-point any that drifted (e.g. a deck installed after its
+// progress arrived).
+async function fixupProgressDeckIds() {
+  const questions = new Map((await dbGetAll(STORES.questions)).map((q) => [q.id, q]));
+  const [reviews, flags] = await Promise.all([dbGetAll(STORES.reviewState), dbGetAll(STORES.flags)]);
+  const fix = (rows) => rows.filter((r) => questions.has(r.questionId) && questions.get(r.questionId).deckId !== r.deckId);
+  const badReviews = fix(reviews);
+  const badFlags = fix(flags);
+  if (!badReviews.length && !badFlags.length) return;
+  await tx([STORES.reviewState, STORES.flags], "readwrite", (s) => {
+    for (const r of badReviews) s[STORES.reviewState].put({ ...r, deckId: questions.get(r.questionId).deckId });
+    for (const f of badFlags) s[STORES.flags].put({ ...f, deckId: questions.get(f.questionId).deckId });
+  });
+}
+
+// Study days aren't synced as records: they're rebuilt from the merged
+// answers. Taking the max per day means a deck deleted on one device (whose
+// answers go with it) never shortens a streak.
+async function rebuildStudyDays() {
+  const [attempts, existing] = await Promise.all([dbGetAll(STORES.attempts), dbGetAll(STORES.studyDays)]);
+  const { dailyGoal } = getSettings();
+  const rebuilt = new Map(studyDaysFromAttempts(attempts, dailyGoal, (ms) => startOfDay(ms).getTime()).map((d) => [d.dayStart, d]));
+  for (const d of existing) {
+    const r = rebuilt.get(d.dayStart);
+    if (!r) rebuilt.set(d.dayStart, d);
+    else if (d.answered > r.answered) rebuilt.set(d.dayStart, { ...d, completedGoal: d.completedGoal || r.completedGoal });
+  }
+  await tx(STORES.studyDays, "readwrite", (s) => {
+    for (const d of rebuilt.values()) s.put(d);
+  });
+}
+
 // ---------- Daily challenge records ----------
 // { dayStart, challengeId, questionIds, score?, total?, bestScore?, completedAt?, plays? }
 
@@ -820,15 +1032,19 @@ export const listChallengeRecords = () => dbGetAll(STORES.challenges);
 
 // Today's challenge with its question set frozen on first view, so answering
 // (which changes review state, and so the gauntlet / weak-spot ordering)
-// doesn't reshuffle the set mid-day. `pick` is challenge.js#pickChallenge.
-export async function getTodaysChallenge(def, pick, now = Date.now()) {
+// doesn't reshuffle the set mid-day. `plan` is challenge.js#planChallenge,
+// `defById` is challenge.js#challengeById, and `recentDays` how far back the
+// records passed to `plan` go.
+export async function getTodaysChallenge({ plan, defById, recentDays }, now = Date.now()) {
   const dayStart = startOfDay(now).getTime();
-  const [pool, record] = await Promise.all([getAllQuestionsFlat(), dbGet(STORES.challenges, dayStart)]);
+  const [pool, records] = await Promise.all([getAllQuestionsFlat(), dbGetAll(STORES.challenges)]);
+  const record = records.find((r) => r.dayStart === dayStart);
   const byId = new Map(pool.map((q) => [q.id, q]));
+  const frozenDef = record && defById(record.challengeId);
 
-  if (record && record.challengeId === def.id && record.questionIds?.every((id) => byId.has(id))) {
+  if (frozenDef && record.questionIds?.every((id) => byId.has(id))) {
     return {
-      def,
+      def: frozenDef,
       questions: record.questionIds.map((id) => byId.get(id)),
       themed: record.themed !== false,
       focus: record.focus,
@@ -836,12 +1052,15 @@ export async function getTodaysChallenge(def, pick, now = Date.now()) {
     };
   }
 
-  const picked = pick(pool, def, now);
+  const since = startOfDay(now);
+  since.setDate(since.getDate() - recentDays);
+  const recent = records.filter((r) => r.dayStart < dayStart && r.dayStart >= since.getTime());
+  const picked = plan(pool, recent, now);
   if (picked.questions.length === 0) return { ...picked, record: null };
   const fresh = {
     ...(record || {}),
     dayStart,
-    challengeId: def.id,
+    challengeId: picked.def.id,
     questionIds: picked.questions.map((q) => q.id),
     themed: picked.themed,
     focus: picked.focus,

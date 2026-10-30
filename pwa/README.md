@@ -324,6 +324,45 @@ Sign-in tokens are verified with `jose` against Google's public keys
 `firebase-admin/auth`, which fails to load on Vercel (`ERR_REQUIRE_ESM`
 from its `jwks-rsa` dependency). Firestore still uses `firebase-admin`.
 
+## Cloud sync (Pro)
+
+Signed-in Pro accounts sync automatically: when the app opens, a few seconds
+after a change, when it goes to the background, and when the connection
+returns (also **Account → Sync now**). Signing in on a new phone or laptop
+brings everything back.
+
+**What syncs:** review schedules, answers, flags, daily challenges, settings,
+decks you imported, the built-in paths and libraries you added, and each
+built-in deck's "in daily mix" switch. Built-in deck content isn't uploaded,
+since every device already has it; only the fact that it's installed.
+
+**How** ([`src/sync.js`](src/sync.js), pure and tested in
+[`tests/sync.test.mjs`](tests/sync.test.mjs)): the device's data is
+flattened into portable records (`review:<questionId>`, `attempt:<syncId>`,
+`deck:<id>`, `mix:<built-in key>`, …), each stored as one Firestore document
+in `users/{uid}/records`. The device remembers the hash of every record as the
+cloud last had it, so it only sends what changed and only applies what changed
+elsewhere. Conflicts:
+
+- **Answers** are append-only, so both devices' answers are always kept.
+  Streak days are rebuilt from the merged answers.
+- **A question's schedule** follows its most recent review.
+- **Challenges** keep the best score and the first completion.
+- **Settings, flags, roadmaps, mix switches:** a device joining the account
+  takes the cloud's version; after that, the newer local edit wins.
+- **Deletions** sync as tombstones. Delete on one device and edit on another:
+  the data is kept.
+
+"What changed since my last pull" uses the server's commit time, never device
+clocks. Records that can't be applied yet (e.g. a library while offline) are
+retried on the next sync.
+
+**Setup:** deploy [`../firebase/firestore.rules`](../firebase/firestore.rules)
+(Firebase console → Firestore → Rules, or `firebase deploy --only firestore:rules`).
+They let the owner read their records any time and write them only while
+their plan is Pro (same rule as the server's entitlement check). Without them,
+sync fails with "permission denied".
+
 ## Backups — read this on iPhone
 
 A Home Screen web app on iOS has **its own storage, separate from Safari**.

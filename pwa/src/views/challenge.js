@@ -1,5 +1,5 @@
 import { h, ICONS } from "../dom.js";
-import { CHALLENGES, challengeForDay, pickChallenge, challengeStreak, weekDays, msUntilTomorrow } from "../challenge.js";
+import { CHALLENGES, challengeById, planChallenge, RECENT_DAYS, challengeStreak, weekDays, msUntilTomorrow } from "../challenge.js";
 import { getTodaysChallenge, listChallengeRecords, saveChallengeResult } from "../store.js";
 import { startOfDay } from "../format.js";
 import { runSession } from "./session.js";
@@ -10,8 +10,9 @@ const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 // a Start button or today's result. `onNeedContent` is called from the empty
 // state (no questions anywhere yet).
 export async function challengeCard({ onNeedContent } = {}) {
-  const def = challengeForDay();
-  const [today, records] = await Promise.all([getTodaysChallenge(def, pickChallenge), listChallengeRecords()]);
+  const today = await getTodaysChallenge({ plan: planChallenge, defById: challengeById, recentDays: RECENT_DAYS });
+  const records = await listChallengeRecords();
+  const def = today.def;
   const rec = today.record;
   const done = !!rec?.completedAt;
   const streak = challengeStreak(records);
@@ -119,7 +120,7 @@ function weekStrip(records) {
       const state = r?.completedAt ? "done" : day === today ? "today" : day < today ? "missed" : "future";
       return h(
         "div",
-        { class: `wd ${state}`, title: CHALLENGES[dow].name },
+        { class: `wd ${state}`, title: (r && challengeById(r.challengeId))?.name || CHALLENGES[dow].name },
         h("span", { class: "wd-dot", "aria-hidden": "true" }),
         h("span", { class: "wd-l" }, DAY_LETTERS[dow])
       );

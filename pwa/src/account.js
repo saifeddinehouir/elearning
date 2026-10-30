@@ -7,6 +7,7 @@ import { FIREBASE_CONFIG, API_BASE } from "./config.js";
 import { setEntitlement } from "./store.js";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/13.0.0/";
+export const FIREBASE_SDK_BASE = FIREBASE;
 
 export const accountsConfigured = () => !!FIREBASE_CONFIG;
 
@@ -20,7 +21,8 @@ function firebase() {
     const load = (async () => {
       const { initializeApp } = await import(`${FIREBASE}firebase-app.js`);
       const fa = await import(`${FIREBASE}firebase-auth.js`);
-      return { fa, auth: fa.getAuth(initializeApp(FIREBASE_CONFIG)) };
+      const app = initializeApp(FIREBASE_CONFIG);
+      return { fa, app, auth: fa.getAuth(app) };
     })();
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Sign-in service didn't load")), LOAD_TIMEOUT_MS));
     return Promise.race([load, timeout]);
@@ -69,6 +71,9 @@ export function currentUser() {
   return known ? { email: known.email, name: known.name || null, offline: true } : null;
 }
 export const accountStatus = () => status;
+// Firebase user id while signed in (not offline-remembered), for cloud sync.
+export const currentUid = () => user?.uid || null;
+export const firebaseApp = async () => (await firebase()).app;
 export const accountReady = () => status !== "loading";
 export function onAccountChange(fn) {
   listeners.add(fn);

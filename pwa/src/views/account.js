@@ -1,5 +1,7 @@
 import { h, openOverlay, toast, ICONS } from "../dom.js";
-import { getEntitlement } from "../store.js";
+import { getEntitlement, getPlan } from "../store.js";
+import { hasFeature } from "../plan.js";
+import { syncNow, syncStatus, onSyncStatus } from "../sync-client.js";
 import {
   currentUser,
   onAccountChange,
@@ -29,7 +31,7 @@ export function openAccount() {
     const paint = () => {
       const u = currentUser();
       if (!u) return close(); // signed out meanwhile; the sign-in screen takes over
-      body.replaceChildren(profile(u), planCard(getEntitlement(), u), details(u), signOutButton());
+      body.replaceChildren(profile(u), planCard(getEntitlement(), u), syncSection(getEntitlement()), details(u), signOutButton());
     };
     paint();
     // Fresh plan details (renewal date, usage) each time the page opens.
@@ -37,6 +39,76 @@ export function openAccount() {
     const off = onAccountChange(() => (overlay.isConnected ? paint() : off()));
     return overlay;
   });
+}
+
+// Cloud sync status and a manual "Sync now", or the Pro pitch on Free.
+function syncSection(ent) {
+  const wrap = h("div", {});
+  wrap.appendChild(h("div", { class: "section-header" }, "Cloud sync"));
+  const list = h("div", { class: "list" });
+  wrap.appendChild(list);
+
+  if (!hasFeature(getPlan(), "sync")) {
+    list.appendChild(
+      h(
+        "button",
+        { class: "list-row tappable", style: "width:100%;text-align:left", onclick: () => openPaywall("sync") },
+        h("span", { class: "icon-chip", html: ICONS.refresh }),
+        h("span", { class: "label" }, "Sync across devices", h("span", { class: "sub" }, "Part of Pro: your progress follows you between phone and laptop.")),
+        h("span", { class: "chevron", html: ICONS.chevron })
+      )
+    );
+    return wrap;
+  }
+
+  const sub = h("span", { class: "sub" });
+  const button = h("button", { class: "btn", style: "padding:8px 12px", onclick: () => syncNow() }, "Sync now");
+  list.appendChild(
+    h(
+      "div",
+      { class: "list-row" },
+      h("span", { class: "icon-chip", html: ICONS.refresh }),
+      h("span", { class: "label" }, "Progress syncs automatically", sub),
+      button
+    )
+  );
+  wrap.appendChild(
+    h(
+      "p",
+      { class: "list-footnote" },
+      "Answers, review schedules, flags, challenges, settings, your imported decks and the libraries you've added. Signing in on a new phone brings them back."
+    )
+  );
+
+  const paint = (s) => {
+    if (!wrap.isConnected && s) return off();
+    button.disabled = s.state === "syncing";
+    sub.style.color = s.state === "error" ? "var(--red)" : "";
+    sub.textContent =
+      s.state === "syncing"
+        ? "Syncing…"
+        : s.state === "error"
+        ? s.error
+        : s.state === "offline"
+        ? "Offline. It syncs when you're back online."
+        : s.at
+        ? `Synced ${ago(s.at)}${s.result && (s.result.pulled || s.result.pushed) ? ` · ${s.result.pushed} sent, ${s.result.pulled} received` : ""}`
+        : "Not synced on this device yet.";
+  };
+  const off = onSyncStatus(paint);
+  paint(syncStatus());
+  void ent;
+  return wrap;
+}
+
+function ago(ms) {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const hr = Math.round(m / 60);
+  if (hr < 24) return `${hr} h ago`;
+  return fmtDateLong(ms);
 }
 
 function profile(u) {

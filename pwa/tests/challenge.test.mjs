@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHALLENGES, challengeForDay, pickChallenge, challengeStreak, weekDays, msUntilTomorrow } from "../src/challenge.js";
+import {
+  CHALLENGES,
+  challengeById,
+  challengeForDay,
+  resolveChallenge,
+  pickChallenge,
+  planChallenge,
+  challengeStreak,
+  weekDays,
+  msUntilTomorrow,
+} from "../src/challenge.js";
 import { addDays, startOfDay } from "../src/format.js";
 
 let seq = 0;
@@ -72,6 +82,54 @@ test("gauntlet prefers questions with lapses", () => {
   const r = pickChallenge([...clean, ...lapsed], byId("gauntlet"), WED);
   const lapsedIds = new Set(lapsed.map((x) => x.id));
   assert.ok(r.questions.every((x) => lapsedIds.has(x.id)));
+});
+
+test("a thin weekday theme swaps for one the pool can fill", () => {
+  // Wednesday is Weak Spot; with no attempts at all it has nothing to work with.
+  const pool = Array.from({ length: 30 }, () => q({ kind: "approach" }));
+  const def = resolveChallenge(pool, WED);
+  assert.notEqual(def.id, challengeForDay(WED).id);
+  assert.equal(resolveChallenge(pool, WED + 3600_000).id, def.id, "stable within the day");
+  const r = pickChallenge(pool, def, WED);
+  assert.ok(r.themed);
+  assert.equal(r.questions.length, def.size);
+});
+
+test("a theme with enough questions runs as itself", () => {
+  const pool = [...Array.from({ length: 20 }, () => q({ kind: "approach" })), ...Array.from({ length: 20 }, () => q())];
+  const monday = addDays(WED, -2).getTime();
+  assert.equal(resolveChallenge(pool, monday).id, "pattern-sprint");
+});
+
+test("the swap prefers themes not played recently", () => {
+  const pool = Array.from({ length: 30 }, (_, i) => q({ kind: "approach", topic: i < 15 ? "A" : "B" }));
+  const played = ["pattern-sprint", "fresh-eyes", "speed", "hard-mode"];
+  // Only Deep Dive is left unplayed among the themes this pool can fill.
+  assert.equal(resolveChallenge(pool, WED, played).id, "deep-dive");
+});
+
+test("deep dive stays inside one topic and names it", () => {
+  const pool = [...Array.from({ length: 14 }, () => q({ topic: "Graphs" })), ...Array.from({ length: 14 }, () => q({ topic: "Trees" }))];
+  const r = pickChallenge(pool, challengeById("deep-dive"), WED);
+  assert.ok(["Graphs", "Trees"].includes(r.focus));
+  assert.ok(r.questions.every((x) => x.topic === r.focus));
+});
+
+test("fresh eyes only picks never-answered questions", () => {
+  const seen = Array.from({ length: 10 }, () => q({ reviewState: { totalReviews: 1, lapses: 0 }, attempts: [{ wasCorrect: true }] }));
+  const unseen = Array.from({ length: 10 }, () => q());
+  const unseenIds = new Set(unseen.map((x) => x.id));
+  const r = pickChallenge([...seen, ...unseen], challengeById("fresh-eyes"), WED);
+  assert.ok(r.questions.every((x) => unseenIds.has(x.id)));
+});
+
+test("questions from recent challenges sit out while others remain", () => {
+  const pool = Array.from({ length: 14 }, () => q({ kind: "approach" }));
+  const yesterday = addDays(WED, -1).getTime();
+  const prev = planChallenge(pool, [], yesterday);
+  const today = planChallenge(pool, [{ challengeId: prev.def.id, questionIds: prev.questions.map((x) => x.id) }], WED);
+  const used = new Set(prev.questions.map((x) => x.id));
+  assert.ok(today.questions.every((x) => !used.has(x.id)), "no repeats from yesterday");
 });
 
 test("challenge streak counts consecutive completed days", () => {

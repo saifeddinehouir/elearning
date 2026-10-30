@@ -1,14 +1,44 @@
 rules_version = '2';
 
-// Only the server (firebase-admin in pwa/api, which bypasses these rules)
-// writes account data. A signed-in user may read their own plan; nobody can
-// write anything from the browser, so Pro can't be granted client-side.
+// users/{uid} (the plan) is written only by the server (firebase-admin in
+// pwa/api, which bypasses these rules), so Pro can't be granted client-side.
+// users/{uid}/records/{id} is cloud sync: the owner can always read their own
+// records back, and can write them while their plan is Pro.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
+
+    // Same rule as api/_lib/entitlement.js: an active subscription, or an
+    // interview pass that hasn't ended.
+    function isPro(uid) {
+      let path = /databases/$(database)/documents/users/$(uid);
+      return exists(path) && (
+        get(path).data.get('subscriptionActive', false) == true ||
+        get(path).data.get('proUntil', 0) > request.time.toMillis()
+      );
+    }
+
+    function validRecord() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['kind', 'key', 'json', 'hash', 'deleted', 'updatedAt'])
+        && d.kind is string && d.key is string && d.deleted is bool
+        && (d.json == null || (d.json is string && d.json.size() < 1000000))
+        && d.updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow read: if signedInAs(uid);
+      allow write: if false;
+
+      match /records/{recordId} {
+        allow read: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && isPro(uid) && validRecord();
+        allow delete: if false;
+      }
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -4,8 +4,10 @@ import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement,
 import { gateFor } from "./gate.js";
 import { renderSignIn } from "./views/signin.js";
 import { openAccount } from "./views/account.js";
+import { startSync } from "./sync-client.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
+import { startOfDayMs } from "./format.js";
 
 import { renderDaily } from "./views/daily.js";
 import { renderStats } from "./views/stats.js";
@@ -67,12 +69,14 @@ function updateBanner() {
 
 let lastRenderedTab = null;
 let renderSeq = 0;
+let renderedDay = startOfDayMs();
 
 // Builds the next view off-screen and swaps it in only once it's ready, so a
 // re-render (every store change triggers one) never flashes an empty page.
 // The enter animation plays only when the tab actually changed.
 async function render() {
   const seq = ++renderSeq;
+  renderedDay = startOfDayMs();
 
   // Signed out (with accounts set up): the sign-in screen instead of the app.
   const gate = gateFor({ configured: accountsConfigured(), status: accountStatus(), knownAccount: !!knownAccount() });
@@ -138,6 +142,18 @@ onChange(() => {
   render();
 });
 
+// An installed PWA (iOS especially) resumes from the background without
+// reloading, so the Today screen would keep showing yesterday's challenge and
+// session. Re-render when the app comes back on a new day, or hits midnight open.
+function rerenderIfNewDay() {
+  if (startOfDayMs() !== renderedDay) render();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") rerenderIfNewDay();
+});
+window.addEventListener("pageshow", rerenderIfNewDay);
+setInterval(rerenderIfNewDay, 60_000);
+
 startNudgeWatcher(() => {
   if (!nudged) {
     nudged = true;
@@ -160,6 +176,7 @@ renameBuiltinPaths().catch((err) => console.error(err));
 if (accountsConfigured()) {
   onAccountChange(render);
   startAccounts().catch((err) => console.error(err));
+  startSync();
   handleCheckoutReturn();
   handleBillingReturn();
 }
