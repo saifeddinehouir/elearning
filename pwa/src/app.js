@@ -1,9 +1,5 @@
-import { h, clear, closeOverlay, toast, ICONS } from "./dom.js";
-import { onChange, getSettings, requestPersistentStorage, renameBuiltinPaths } from "./store.js";
-import { accountsConfigured, startAccounts, onAccountChange, refreshEntitlement, accountStatus, knownAccount } from "./account.js";
-import { gateFor } from "./gate.js";
-import { renderSignIn } from "./views/signin.js";
-import { openAccount } from "./views/account.js";
+import { h, clear, closeOverlay, ICONS } from "./dom.js";
+import { onChange, getSettings, requestPersistentStorage } from "./store.js";
 import { registerServiceWorker, startNudgeWatcher } from "./notifications.js";
 import { watchForUpdates } from "./updates.js";
 import { startOfDayMs } from "./format.js";
@@ -76,16 +72,6 @@ let renderedDay = startOfDayMs();
 async function render() {
   const seq = ++renderSeq;
   renderedDay = startOfDayMs();
-
-  // Signed out (with accounts set up): the sign-in screen instead of the app.
-  const gate = gateFor({ configured: accountsConfigured(), status: accountStatus(), knownAccount: !!knownAccount() });
-  if (gate !== "open") {
-    closeOverlay();
-    clear(appRoot).append(renderSignIn({ loading: gate === "loading" }));
-    lastRenderedTab = null;
-    return;
-  }
-
   const tab = TABS.find((t) => t.id === current) || TABS[0];
 
   const view = h("div", { id: "view", class: lastRenderedTab === tab.id ? "" : "view-enter" });
@@ -169,51 +155,3 @@ registerServiceWorker().then(() => {
 applyTheme();
 render();
 requestPersistentStorage();
-renameBuiltinPaths().catch((err) => console.error(err));
-
-// Accounts are off until src/config.js has a Firebase config.
-if (accountsConfigured()) {
-  onAccountChange(render);
-  startAccounts().catch((err) => console.error(err));
-  handleCheckoutReturn();
-  handleBillingReturn();
-}
-
-// Back from Stripe's billing page (?billing=return): refresh the plan, since
-// it may have been cancelled or changed there, and reopen the Account page.
-function handleBillingReturn() {
-  const params = new URLSearchParams(location.search);
-  if (!params.has("billing")) return;
-  params.delete("billing");
-  const query = params.toString();
-  history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
-  const stop = onAccountChange(async () => {
-    if (accountStatus() !== "signed_in") return;
-    stop();
-    await refreshEntitlement().catch(() => null);
-    openAccount();
-  });
-}
-
-// Back from Stripe Checkout (?checkout=success|cancel). The webhook that
-// grants Pro can land a few seconds after the redirect, so check a few times.
-function handleCheckoutReturn() {
-  const params = new URLSearchParams(location.search);
-  const result = params.get("checkout");
-  if (!result) return;
-  params.delete("checkout");
-  const query = params.toString();
-  history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
-  if (result !== "success") return toast("Checkout cancelled. Nothing was charged.", 3000);
-  toast("Payment received. Unlocking Pro…", 3000);
-  const stop = onAccountChange(async () => {
-    if (accountStatus() !== "signed_in") return;
-    stop();
-    for (let i = 0; i < 6; i++) {
-      const me = await refreshEntitlement().catch(() => null);
-      if (me?.plan === "pro") return toast("You're on Pro. Thank you!", 3500);
-      await new Promise((r) => setTimeout(r, 2500));
-    }
-    toast("Pro is taking longer than usual to unlock. Reopen the app in a minute.", 5000);
-  });
-}

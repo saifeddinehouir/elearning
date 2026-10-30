@@ -16,7 +16,6 @@ import { applySM2, gradeForBinary, newReviewState, projectedInterval } from "./s
 import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 import { libraryByKey, libraryKeyFor } from "./library.js";
-import { effectivePlan, entitledFrom, isPlan, isDevHost, canInstallPath, libraryEntriesFor } from "./plan.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -36,7 +35,6 @@ const DEFAULT_SETTINGS = {
   reminderHour: 19,
   reminderMinute: 0,
   theme: "system", // "system" | "light" | "dark"
-  interview: null, // { date, setOn } as day starts (ms), see interview.js
 };
 
 export function getSettings() {
@@ -52,63 +50,6 @@ export function setSettings(patch) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   emit();
   return next;
-}
-
-// ---------- Plan (free / pro) ----------
-// The override is per device: a preview switch now, and where the plan from a
-// verified purchase will be cached once billing exists.
-
-const PLAN_KEY = "dailyqcm.plan";
-
-// The preview switch's value, on a development host only; anywhere else it's
-// ignored, so it can't unlock Pro.
-export const previewAllowed = () => typeof location !== "undefined" && isDevHost(location.hostname);
-
-export function getPlanOverride() {
-  if (!previewAllowed()) return null;
-  try {
-    const p = localStorage.getItem(PLAN_KEY);
-    return isPlan(p) ? p : null;
-  } catch {
-    return null;
-  }
-}
-
-export const getPlan = () => effectivePlan(getPlanOverride(), undefined, entitledFrom(getEntitlement()));
-
-// The signed-in account's plan as /api/me last reported it (see account.js),
-// cached so the app knows it's Pro offline. null when signed out.
-const ENTITLEMENT_KEY = "dailyqcm.entitlement";
-
-export function getEntitlement() {
-  try {
-    return JSON.parse(localStorage.getItem(ENTITLEMENT_KEY) || "null");
-  } catch {
-    return null;
-  }
-}
-
-export function setEntitlement(value) {
-  try {
-    if (value) localStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(value));
-    else localStorage.removeItem(ENTITLEMENT_KEY);
-  } catch {}
-  emit();
-}
-
-export function setPlanOverride(plan) {
-  try {
-    if (isPlan(plan)) localStorage.setItem(PLAN_KEY, plan);
-    else localStorage.removeItem(PLAN_KEY);
-  } catch {}
-  emit();
-}
-
-export class ProRequiredError extends Error {
-  constructor(what) {
-    super(`${what} needs Pro`);
-    this.name = "ProRequiredError";
-  }
 }
 
 // ---------- Reads ----------
@@ -261,10 +202,6 @@ async function buildPool(filterFn) {
 
 export const getDailyPool = () => buildPool((d) => d.includeInMix !== false);
 export const getDeckPool = (deckId) => buildPool((d) => d.id === deckId);
-export const getDecksPool = (deckIds) => {
-  const ids = new Set(deckIds);
-  return buildPool((d) => ids.has(d.id));
-};
 export const getAllQuestionsFlat = () => buildPool(() => true);
 
 export const getAllAttempts = () => dbGetAll(STORES.attempts);
@@ -592,8 +529,6 @@ export async function installPatternPath(key = PATTERN_PATH.key) {
   const path = pathByKey.get(key);
   if (!path) throw new Error(`Unknown path ${key}`);
   const [decks, existing] = await Promise.all([dbGetAll(STORES.decks), getPatternPath(key)]);
-  // Repairing a path that's already installed is always allowed.
-  if (!existing && !canInstallPath(getPlan(), key)) throw new ProRequiredError(path.name);
   const deckByKey = new Map(decks.filter((d) => d.builtinKey).map((d) => [d.builtinKey, d]));
 
   const deckFor = async (pattern, i) => {
@@ -626,20 +561,6 @@ export async function installPatternPath(key = PATTERN_PATH.key) {
   await dbPut(STORES.roadmaps, roadmap);
   emit();
   return roadmap;
-}
-
-// Renames installed built-in paths still carrying a name the path used to ship
-// under (see formerNames in patterns.js). A name you chose yourself is kept.
-// Returns how many were renamed.
-export async function renameBuiltinPaths() {
-  const renamed = (await dbGetAll(STORES.roadmaps))
-    .map((r) => [r, pathByKey.get(r.builtin)])
-    .filter(([r, path]) => path && (path.formerNames || []).includes(r.name))
-    .map(([r, path]) => ({ ...r, name: path.name }));
-  if (renamed.length === 0) return 0;
-  await dbBulkPut(STORES.roadmaps, renamed);
-  emit();
-  return renamed.length;
 }
 
 // Unlocks every built-in path stage whose previous stage is done. Returns the
@@ -676,24 +597,14 @@ export async function syncPathUnlocks() {
 
 // ---------- Built-in deck libraries (e.g. Java & Spring Boot) ----------
 
-// A library's index.json: its decks in study order with names, counts and
-// topics. Served from the offline cache when there's no network.
-export async function getLibraryIndex(key) {
-  const lib = libraryByKey.get(key);
-  if (!lib) throw new Error(`Unknown library ${key}`);
-  return (await fetch(`${lib.dir}index.json`)).json();
-}
-
 // Installs (or repairs) a library: every deck in its index.json, in order,
 // plus a roadmap with all stages open. A deck already installed from the
 // library is reused; a deck you imported yourself under the same name is
-// adopted (keeping its progress) instead of duplicated. On the free plan only
-// the first few decks are added; installing again after upgrading adds the
-// rest to the same roadmap.
+// adopted (keeping its progress) instead of duplicated.
 export async function installLibrary(key) {
   const lib = libraryByKey.get(key);
   if (!lib) throw new Error(`Unknown library ${key}`);
-  const index = libraryEntriesFor(getPlan(), await getLibraryIndex(key));
+  const index = await (await fetch(`${lib.dir}index.json`)).json();
   const [decks, roadmaps] = await Promise.all([dbGetAll(STORES.decks), dbGetAll(STORES.roadmaps)]);
   const byLibKey = new Map(decks.filter((d) => d.libraryKey).map((d) => [d.libraryKey, d]));
   const byName = new Map(decks.filter((d) => !d.libraryKey && !d.builtinKey).map((d) => [d.name, d]));
@@ -710,29 +621,31 @@ export async function installLibrary(key) {
       const dto = await (await fetch(`${lib.dir}${entry.id}.json`)).json();
       ({ deck } = await importDeck(dto, "copy", { libraryKey: lk, silent: true }));
     }
-    deckIds.push({ entry, deck, added: !byLibKey.has(lk) });
+    deckIds.push({ entry, deck });
   }
 
-  const nodeFor = ({ entry, deck }) => ({
-    id: uuid(),
-    title: entry.name,
-    description: entry.topics.slice(0, 4).join(" · "),
-    deckId: deck.id,
-    libraryDeck: entry.id,
-    unlocked: true,
-  });
   let roadmap = roadmaps.find((r) => r.builtin === lib.key);
   if (roadmap) {
     const existing = new Map(roadmap.nodes.map((n) => [n.libraryDeck, n]));
-    for (const pair of deckIds) {
-      const node = existing.get(pair.entry.id);
-      if (node) node.deckId = pair.deck.id;
-      // Only decks new to this device get a stage, so a stage you removed
-      // from the roadmap stays removed.
-      else if (pair.added) roadmap.nodes.push(nodeFor(pair));
+    for (const { entry, deck } of deckIds) {
+      const node = existing.get(entry.id);
+      if (node) node.deckId = deck.id;
     }
   } else {
-    roadmap = { id: uuid(), name: lib.name, builtin: lib.key, createdAt: Date.now(), nodes: deckIds.map(nodeFor) };
+    roadmap = {
+      id: uuid(),
+      name: lib.name,
+      builtin: lib.key,
+      createdAt: Date.now(),
+      nodes: deckIds.map(({ entry, deck }) => ({
+        id: uuid(),
+        title: entry.name,
+        description: entry.topics.slice(0, 4).join(" · "),
+        deckId: deck.id,
+        libraryDeck: entry.id,
+        unlocked: true,
+      })),
+    };
   }
   await dbPut(STORES.roadmaps, roadmap);
   emit();
