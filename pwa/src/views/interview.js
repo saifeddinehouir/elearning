@@ -163,7 +163,8 @@ function deckGroups(decks) {
 
 const unseenIn = (decks) => decks.reduce((n, d) => n + Math.round(d.questionCount * (1 - d.studiedFraction)), 0);
 
-export async function openInterviewSheet() {
+// `deckIds` preselects "Choose decks" with those decks (e.g. a company track).
+export async function openInterviewSheet({ deckIds } = {}) {
   if (!available()) return openPaywall("Interview date mode");
   const decks = await listDecks();
   openOverlay((close) => {
@@ -187,7 +188,7 @@ export async function openInterviewSheet() {
     body.appendChild(h("div", { class: "list", style: "padding:12px 16px" }, input));
 
     // ---------- What to study ----------
-    const focus = iv ? focusDeckIds(iv, decks.map((d) => d.id)) : null;
+    const focus = focusDeckIds(deckIds ? { deckIds } : iv, decks.map((d) => d.id));
     let mode = focus ? "choose" : "mix";
     const selected = new Set(focus || decks.filter((d) => d.includeInMix !== false).map((d) => d.id));
     const chosenDecks = () => (mode === "mix" ? decks.filter((d) => d.includeInMix !== false) : decks.filter((d) => selected.has(d.id)));

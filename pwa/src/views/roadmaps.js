@@ -20,8 +20,10 @@ import { openCheatSheet } from "./guide.js";
 import { ring } from "../charts.js";
 import { LIBRARIES, libraryByKey, missingEntries } from "../library.js";
 import { installLibrary, getLibraryIndex, getPlan, ProRequiredError } from "../store.js";
-import { canInstallPath, isPro, FREE_LIBRARY_DECKS, PRO_FEATURES } from "../plan.js";
+import { canInstallPath, isPro, FREE_LIBRARY_DECKS } from "../plan.js";
 import { openPaywall, proBadge } from "./paywall.js";
+import { companyOfRoadmapKey } from "../companies.js";
+import { companyPromoCard, openCompanySheet } from "./company.js";
 
 // Installs (or repairs) a built-in deck library and opens its roadmap.
 export async function installAndOpenLibrary(key) {
@@ -53,19 +55,6 @@ export function libraryPromoCard(lib = LIBRARIES[0]) {
       h("span", {}, isPro(getPlan()) ? "all open" : `${FREE_LIBRARY_DECKS} decks free`)
     ),
     h("button", { class: "btn primary block", onclick: () => installAndOpenLibrary(lib.key) }, `Add ${lib.name}`)
-  );
-}
-
-// Teaser for company-specific prep, announced before it exists (the Pro
-// sheet lists it as "Soon"). Not tappable: there's nothing to open yet.
-function comingSoonCard() {
-  const company = PRO_FEATURES.find((f) => f.id === "company-prep");
-  return h(
-    "div",
-    { class: "card promo soon" },
-    h("div", { class: "kicker" }, "Coming soon", proBadge()),
-    h("div", { class: "promo-title" }, "Company interview prep"),
-    h("p", { class: "small muted", style: "margin:4px 0 0" }, company.sub)
   );
 }
 
@@ -144,7 +133,7 @@ export async function renderRoadmaps() {
   for (const path of PATHS) {
     if (!roadmaps.some((r) => r.builtin === path.key)) wrap.appendChild(pathPromoCard(path));
   }
-  wrap.appendChild(comingSoonCard());
+  wrap.appendChild(companyPromoCard(roadmaps));
 
   if (roadmaps.length === 0 && decks.length === 0) {
     wrap.appendChild(
@@ -327,7 +316,7 @@ function roadmapsSection(roadmaps, decks) {
       h(
         "div",
         { class: "row", style: "align-items:flex-start" },
-        h("span", { class: `icon-chip ${toneOf(rm) === "hard" ? "c-red" : rm.builtin ? "c-purple" : "c-teal"}`, html: rm.builtin ? ICONS.code : ICONS.map }),
+        h("span", { class: `icon-chip ${toneOf(rm) === "hard" ? "c-red" : rm.builtin ? "c-purple" : "c-teal"}`, html: companyOfRoadmapKey(rm.builtin) ? ICONS.target : rm.builtin ? ICONS.code : ICONS.map }),
         h(
           "div",
           { class: "spacer" },
@@ -469,7 +458,10 @@ export function openRoadmapDetail(roadmapId) {
       const questions = roadmap.nodes.reduce((s, n) => s + (deckById.get(n.deckId)?.questionCount || 0), 0);
       const frac = total ? done / total : 0;
       const lib = libraryByKey.get(roadmap.builtin);
-      const how = lib
+      const company = companyOfRoadmapKey(roadmap.builtin);
+      const how = company
+        ? `These ${roadmap.nodes.length} decks cover what ${company.name} asks about most, most important first. They're all in your daily mix; study them in any order.`
+        : lib
         ? `All ${roadmap.nodes.length} decks are in your daily mix. This is a suggested order; study them in any order.`
         : rule === "mastery"
           ? `A stage opens once you've seen every question in the one before it and got at least ${Math.round(MASTERY * 100)}% right on your latest try. Locked stages can still be studied on their own.`
@@ -490,7 +482,7 @@ export function openRoadmapDetail(roadmapId) {
           h(
             "div",
             { class: "spacer" },
-            h("div", { class: "kicker" }, lib ? "Built-in library" : tone === "hard" ? "Built-in path · challenging" : roadmap.builtin ? "Built-in path" : "Your roadmap"),
+            h("div", { class: "kicker" }, company ? "Company interview prep" : lib ? "Built-in library" : tone === "hard" ? "Built-in path · challenging" : roadmap.builtin ? "Built-in path" : "Your roadmap"),
             h("div", { class: "promo-title" }, roadmap.name),
             h(
               "div",
@@ -501,7 +493,9 @@ export function openRoadmapDetail(roadmapId) {
           )
         ),
         roadmap.builtin ? h("p", { class: "small muted", style: "margin-top:12px" }, how) : null,
-        roadmap.builtin && !lib
+        company
+          ? h("button", { class: "btn block mt", onclick: () => openCompanySheet(company.key, { onOpenRoadmap: openRoadmapDetail }) }, h("span", { html: ICONS.list }), `How ${company.name} interviews`)
+          : roadmap.builtin && !lib
           ? h("button", { class: "btn block mt", onclick: () => openCheatSheet(roadmap.builtin) }, h("span", { html: ICONS.list }), "Pattern cheat sheet")
           : null
       );

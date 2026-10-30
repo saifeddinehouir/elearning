@@ -222,6 +222,30 @@ Nothing is written to your review history. The plan only changes how the
 queue is built, so removing the date (or letting it pass) returns everything
 to the normal schedule.
 
+## Company interview prep (Pro)
+
+**Roadmaps → Prep for a specific company** lists Google, Meta, Amazon and
+Microsoft. Each profile shows the usual interview loop round by round, tips,
+and a track: the built-in pattern and library decks that cover what that
+company asks most, most important first. Data:
+[`src/companies.js`](src/companies.js), checked by
+[`tests/companies.test.mjs`](tests/companies.test.mjs).
+
+- **Start the track** adds only the decks it names (reusing any already on
+  the device, so installing the full path or library later doesn't duplicate
+  them), puts them in the daily mix, and lays them out as a roadmap with every
+  stage open. Free users can read the profiles; starting a track is Pro.
+- **Set the interview date** from the profile opens interview date mode with
+  the track's decks already chosen.
+- Behavioural rounds aren't drilled by decks; the profile's tips cover them.
+- Syncs like the built-in paths: the track's roadmap is rebuilt on the other
+  device and progress follows by question.
+
+To add a company, add an entry to `COMPANIES`: `p:<pattern id>` stages from
+[`src/patterns.js`](src/patterns.js) / `patterns-advanced.js`, and
+`l:<library>:<deck id>` stages from a library's `index.json`. The tests fail on
+an unknown reference.
+
 ## Free and Pro plans (not enforced yet)
 
 [`src/plan.js`](src/plan.js) defines what each plan can add. Free keeps the

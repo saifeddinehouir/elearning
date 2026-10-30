@@ -30,7 +30,7 @@ export const PRO_FEATURES = [
   { id: "content", title: "Every built-in deck and path", sub: "The full Java & Spring and DevOps libraries, the Advanced patterns path, and every library added later.", live: true },
   { id: "ai-decks", title: "Make decks from YouTube videos", sub: "Paste a lecture or tutorial link and get a ready deck, with no JSON round trip.", live: true },
   { id: "interview-date", title: "Interview date mode", sub: "Set the date and reviews are paced so everything is covered by then, with a readiness score per topic.", live: true },
-  { id: "company-prep", title: "Company-specific interview prep", sub: "Pick the company you're interviewing with and get a track built around how it interviews: the topics it favours, its question formats and its stages.", live: false },
+  { id: "company-prep", title: "Company-specific interview prep", sub: "Pick the company you're interviewing with and get a track built around how it interviews: the topics it favours, its question formats and its stages.", live: true },
   { id: "sync", title: "Cloud sync and backup", sub: "Progress follows you between phone and laptop, and survives a lost or reset phone.", live: true },
 ];
 

@@ -17,7 +17,8 @@ import { uuid, UUID_RE, startOfDay } from "./format.js";
 import { PATTERN_PATH, pathByKey, buildPatternDeck, isStageDone } from "./patterns.js";
 import { libraryByKey, libraryKeyFor } from "./library.js";
 import { studyDaysFromAttempts } from "./sync.js";
-import { effectivePlan, entitledFrom, isPlan, isDevHost, canInstallPath, libraryEntriesFor } from "./plan.js";
+import { effectivePlan, entitledFrom, isPlan, isDevHost, canInstallPath, libraryEntriesFor, hasFeature } from "./plan.js";
+import { companyByKey, companyRoadmapKey, companyOfRoadmapKey, trackStages } from "./companies.js";
 
 const bus = new EventTarget();
 export const onChange = (fn) => {
@@ -741,6 +742,73 @@ export async function installLibrary(key) {
   return roadmap;
 }
 
+// ---------- Company interview prep (Pro) ----------
+
+// Installs (or repairs) a company's track: only the pattern and library decks
+// it names, each reused if it's already on the device (so installing the full
+// path or library later doesn't duplicate them), all put in the daily mix,
+// plus a roadmap with every stage open. Starting a track is Pro; repairing one
+// that's already installed is always allowed.
+export async function installCompanyTrack(key) {
+  const company = companyByKey.get(key);
+  if (!company) throw new Error(`Unknown company ${key}`);
+  const builtin = companyRoadmapKey(company);
+  const [decks, roadmaps] = await Promise.all([dbGetAll(STORES.decks), dbGetAll(STORES.roadmaps)]);
+  const existing = roadmaps.find((r) => r.builtin === builtin);
+  if (!existing && !hasFeature(getPlan(), "company-prep")) throw new ProRequiredError(`${company.name} interview prep`);
+
+  const byBuiltinKey = new Map(decks.filter((d) => d.builtinKey).map((d) => [d.builtinKey, d]));
+  const byLibKey = new Map(decks.filter((d) => d.libraryKey).map((d) => [d.libraryKey, d]));
+  const indexes = new Map();
+  const libraryEntry = async (lib, deckId) => {
+    if (!indexes.has(lib.key)) indexes.set(lib.key, await getLibraryIndex(lib.key));
+    const entry = indexes.get(lib.key).find((e) => e.id === deckId);
+    if (!entry) throw new Error(`${lib.name} has no deck ${deckId}`);
+    return entry;
+  };
+
+  const stages = [];
+  for (const s of trackStages(company)) {
+    if (s.kind === "pattern") {
+      let deck = byBuiltinKey.get(s.pattern.id);
+      if (!deck) ({ deck } = await importDeck(buildPatternDeck(s.pattern, s.index, s.path), "copy", { builtinKey: s.pattern.id, includeInMix: true, silent: true }));
+      stages.push({ ref: `p:${s.pattern.id}`, title: s.pattern.name, why: s.why, deck });
+    } else {
+      const entry = await libraryEntry(s.lib, s.deckId);
+      const lk = libraryKeyFor(s.lib, entry.id);
+      let deck = byLibKey.get(lk);
+      if (!deck) {
+        const dto = await (await fetch(`${s.lib.dir}${entry.id}.json`)).json();
+        ({ deck } = await importDeck(dto, "copy", { libraryKey: lk, silent: true }));
+      }
+      stages.push({ ref: `l:${lk}`, title: entry.name, why: s.why, deck });
+    }
+  }
+
+  // Starting a track puts its decks in the daily mix; a repair leaves your
+  // mix choices alone.
+  if (!existing) {
+    for (const { deck } of stages) {
+      if (deck.includeInMix === false) await dbPut(STORES.decks, { ...(await dbGet(STORES.decks, deck.id)), includeInMix: true });
+    }
+  }
+
+  const nodeFor = ({ ref, title, why, deck }) => ({ id: uuid(), title, description: why, deckId: deck.id, companyStage: ref, unlocked: true });
+  let roadmap = existing;
+  if (roadmap) {
+    const byRef = new Map(stages.map((s) => [s.ref, s]));
+    for (const node of roadmap.nodes) {
+      const s = node.companyStage && byRef.get(node.companyStage);
+      if (s) node.deckId = s.deck.id;
+    }
+  } else {
+    roadmap = { id: uuid(), name: `${company.name} interview prep`, builtin, createdAt: Date.now(), nodes: stages.map(nodeFor) };
+  }
+  await dbPut(STORES.roadmaps, roadmap);
+  emit();
+  return roadmap;
+}
+
 // ---------- Backup & restore ----------
 // Everything that lives in IndexedDB plus settings, as one JSON file. On iPhone
 // a Home Screen app's storage is deleted when the app is removed, so this file
@@ -952,6 +1020,7 @@ async function applyStructural(r) {
       } else if (!have) {
         if (pathByKey.has(r.key)) await installPatternPath(r.key);
         else if (libraryByKey.has(r.key)) await installLibrary(r.key);
+        else if (companyOfRoadmapKey(r.key)) await installCompanyTrack(companyOfRoadmapKey(r.key).key);
       }
       return;
     }
